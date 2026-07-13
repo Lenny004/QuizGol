@@ -1,0 +1,77 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: quizgol_app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: quizgol
+      DB_USERNAME: quizgol
+      DB_PASSWORD: secret
+      RUN_MIGRATIONS: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - quizgol
+
+  nginx:
+    image: nginx:alpine
+    container_name: quizgol_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    networks:
+      - quizgol
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: quizgol_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: quizgol
+      POSTGRES_USER: quizgol
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quizgol -d quizgol"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - quizgol
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: quizgol_mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    networks:
+      - quizgol
+
+networks:
+  quizgol:
+    driver: bridge
+
+volumes:
+  postgres_data:
