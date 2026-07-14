@@ -5,6 +5,9 @@ namespace Database\Seeders;
 use App\Models\Grade;
 use Illuminate\Database\Seeder;
 
+/**
+ * Carga los grados escolares (1° Primaria … 9° / 3° Ciclo).
+ */
 class GradeSeeder extends Seeder
 {
     public function run(): void
@@ -21,12 +24,12 @@ class GradeSeeder extends Seeder
             ['name' => '9° / 3° Ciclo', 'slug' => '9-ciclo', 'level_order' => 9],
         ];
 
-        foreach ($grades as $grade) {
+        foreach ($grades as $gradeData) {
             Grade::updateOrCreate(
-                ['slug' => $grade['slug']],
+                ['slug' => $gradeData['slug']],
                 [
-                    'name' => $grade['name'],
-                    'level_order' => $grade['level_order'],
+                    'name' => $gradeData['name'],
+                    'level_order' => $gradeData['level_order'],
                     'is_active' => true,
                 ]
             );

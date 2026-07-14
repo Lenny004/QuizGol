@@ -11,6 +11,11 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
+/**
+ * Unirse a una sala pública (sin login) con código + apodo.
+ *
+ * Guarda session_token en cookie httponly "quizgol_player".
+ */
 class JoinController extends Controller
 {
     public function __construct(
@@ -19,23 +24,28 @@ class JoinController extends Controller
     ) {
     }
 
+    /**
+     * Formulario: código de sala, apodo y (si es partido) equipo.
+     */
     public function show(): View
     {
         return view('play.join');
     }
 
+    /**
+     * Crea el RoomPlayer y redirige a /play/{code} con la cookie de sesión.
+     */
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
+        $validatedData = $request->validate([
             'code' => ['required', 'string', 'max:8'],
             'nickname' => ['required', 'string', 'max:40'],
             'team' => ['nullable', 'string', 'in:home,away'],
             'team_id' => ['nullable', 'integer'],
         ]);
 
-        $code = strtoupper(trim($data['code']));
-
-        $room = Room::query()->where('code', $code)->first();
+        $roomCode = strtoupper(trim($validatedData['code']));
+        $room = Room::query()->where('code', $roomCode)->first();
 
         if (! $room) {
             return back()
@@ -43,28 +53,29 @@ class JoinController extends Controller
                 ->withErrors(['code' => 'No existe una sala con ese código.']);
         }
 
-        if (! in_array($room->status, ['lobby', 'active'], true)) {
+        if (! in_array($room->status, [Room::STATUS_LOBBY, Room::STATUS_ACTIVE], true)) {
             return back()
                 ->withInput()
                 ->withErrors(['code' => 'Esta sala ya terminó.']);
         }
 
         try {
-            if ($room->mode === 'match') {
+            if ($room->isMatchMode()) {
                 $player = $this->matchGames->createPlayer(
                     $room,
-                    $data['nickname'],
-                    $data['team'] ?? null,
-                    isset($data['team_id']) ? (int) $data['team_id'] : null,
+                    $validatedData['nickname'],
+                    $validatedData['team'] ?? null,
+                    isset($validatedData['team_id']) ? (int) $validatedData['team_id'] : null,
                 );
             } else {
-                $player = $this->quizRooms->createPlayer($room, $data['nickname']);
+                $player = $this->quizRooms->createPlayer($room, $validatedData['nickname']);
             }
-        } catch (ValidationException $e) {
-            return back()->withInput()->withErrors($e->errors());
+        } catch (ValidationException $exception) {
+            return back()->withInput()->withErrors($exception->errors());
         }
 
-        $cookie = cookie(
+        // Cookie de 24h: identifica al jugador en las siguientes peticiones.
+        $playerCookie = cookie(
             'quizgol_player',
             $player->session_token,
             60 * 24,
@@ -76,7 +87,7 @@ class JoinController extends Controller
 
         return redirect()
             ->route('play.game', ['code' => $room->code])
-            ->withCookie($cookie)
+            ->withCookie($playerCookie)
             ->with('success', '¡Bienvenido al partido!');
     }
 }

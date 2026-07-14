@@ -6,16 +6,21 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
+/**
+ * Restringe el área de maestro a usuarios con rol teacher o admin.
+ *
+ * Alias registrado en bootstrap/app.php como "teacher".
+ */
 class EnsureTeacher
 {
     /**
-     * Allow only teachers and admins into the teacher area.
+     * Continúa la petición solo si el usuario puede acceder al área de maestro.
      */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (! $user || ! in_array($user->role, ['teacher', 'admin'], true)) {
+        if (! $user || ! $user->canAccessTeacherArea()) {
             abort(403, 'Solo maestros y administradores pueden entrar aquí.');
         }
 

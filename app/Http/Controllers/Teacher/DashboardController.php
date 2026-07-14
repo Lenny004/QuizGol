@@ -5,8 +5,14 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use Illuminate\View\View;
 
+/**
+ * Panel principal del maestro: resumen de secciones y salas activas.
+ */
 class DashboardController extends Controller
 {
+    /**
+     * Muestra el dashboard con contadores y listas recientes.
+     */
     public function index(): View
     {
         $user = auth()->user();

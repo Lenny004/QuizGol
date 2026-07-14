@@ -6,6 +6,12 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
+/**
+ * Usuarios de prueba para desarrollo local.
+ *
+ * admin@quizgol.test / password  (rol admin)
+ * maestro@quizgol.test / password (rol teacher)
+ */
 class DemoUserSeeder extends Seeder
 {
     public function run(): void
@@ -15,7 +21,7 @@ class DemoUserSeeder extends Seeder
             [
                 'name' => 'Admin QuizGol',
                 'password' => Hash::make('password'),
-                'role' => 'admin',
+                'role' => User::ROLE_ADMIN,
             ]
         );
 
@@ -24,9 +30,8 @@ class DemoUserSeeder extends Seeder
             [
                 'name' => 'Maestro Demo',
                 'password' => Hash::make('password'),
-                'role' => 'teacher',
+                'role' => User::ROLE_TEACHER,
             ]
         );
     }
 }
-

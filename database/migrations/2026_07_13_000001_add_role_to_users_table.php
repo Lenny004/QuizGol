@@ -4,6 +4,9 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Agrega el rol del usuario (teacher | admin) a la tabla users.
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -20,4 +23,3 @@ return new class extends Migration
         });
     }
 };
-

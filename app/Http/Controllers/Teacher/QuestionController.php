@@ -11,8 +11,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
+/**
+ * CRUD de preguntas (opción múltiple) dentro de una sección.
+ */
 class QuestionController extends Controller
 {
+    /**
+     * Lista las preguntas de la sección ordenadas por sort_order.
+     */
     public function index(Section $section): View
     {
         $this->authorizeSection($section);
@@ -28,6 +34,9 @@ class QuestionController extends Controller
         return view('teacher.questions.index', compact('section', 'questions'));
     }
 
+    /**
+     * Formulario para crear una pregunta nueva.
+     */
     public function create(Section $section): View
     {
         $this->authorizeSection($section);
@@ -35,23 +44,30 @@ class QuestionController extends Controller
         return view('teacher.questions.create', compact('section'));
     }
 
+    /**
+     * Guarda pregunta + respuestas en una transacción.
+     */
     public function store(Request $request, Section $section): RedirectResponse
     {
         $this->authorizeSection($section);
 
-        $data = $this->validateQuestion($request);
+        $validatedData = $this->validateQuestion($request);
 
-        DB::transaction(function () use ($section, $data) {
+        DB::transaction(function () use ($section, $validatedData) {
             $question = $section->questions()->create([
-                'prompt' => $data['prompt'],
+                'prompt' => $validatedData['prompt'],
                 'type' => Question::TYPE_MULTIPLE_CHOICE,
-                'difficulty' => $data['difficulty'],
-                'time_limit' => $data['time_limit'],
-                'points' => $data['points'],
+                'difficulty' => $validatedData['difficulty'],
+                'time_limit' => $validatedData['time_limit'],
+                'points' => $validatedData['points'],
                 'sort_order' => $section->questions()->count(),
             ]);
 
-            $this->syncAnswers($question, $data['answers'], (int) $data['correct_index']);
+            $this->syncAnswers(
+                $question,
+                $validatedData['answers'],
+                (int) $validatedData['correct_index']
+            );
         });
 
         return redirect()
@@ -59,6 +75,9 @@ class QuestionController extends Controller
             ->with('success', 'Pregunta creada.');
     }
 
+    /**
+     * Formulario de edición de pregunta y sus respuestas.
+     */
     public function edit(Question $question): View
     {
         $question->load(['section', 'answers']);
@@ -70,23 +89,31 @@ class QuestionController extends Controller
         ]);
     }
 
+    /**
+     * Actualiza pregunta; recrea las respuestas (MVP simple).
+     */
     public function update(Request $request, Question $question): RedirectResponse
     {
         $question->load('section');
         $this->authorizeSection($question->section);
 
-        $data = $this->validateQuestion($request);
+        $validatedData = $this->validateQuestion($request);
 
-        DB::transaction(function () use ($question, $data) {
+        DB::transaction(function () use ($question, $validatedData) {
             $question->update([
-                'prompt' => $data['prompt'],
-                'difficulty' => $data['difficulty'],
-                'time_limit' => $data['time_limit'],
-                'points' => $data['points'],
+                'prompt' => $validatedData['prompt'],
+                'difficulty' => $validatedData['difficulty'],
+                'time_limit' => $validatedData['time_limit'],
+                'points' => $validatedData['points'],
             ]);
 
+            // MVP: borrar y volver a crear las opciones (pierde IDs antiguos).
             $question->answers()->delete();
-            $this->syncAnswers($question, $data['answers'], (int) $data['correct_index']);
+            $this->syncAnswers(
+                $question,
+                $validatedData['answers'],
+                (int) $validatedData['correct_index']
+            );
         });
 
         return redirect()
@@ -94,6 +121,9 @@ class QuestionController extends Controller
             ->with('success', 'Pregunta actualizada.');
     }
 
+    /**
+     * Elimina la pregunta de la sección.
+     */
     public function destroy(Question $question): RedirectResponse
     {
         $question->load('section');
@@ -107,17 +137,23 @@ class QuestionController extends Controller
             ->with('success', 'Pregunta eliminada.');
     }
 
+    /**
+     * Solo el dueño de la sección puede gestionar sus preguntas.
+     */
     private function authorizeSection(Section $section): void
     {
         abort_unless($section->user_id === auth()->id(), 403);
     }
 
     /**
+     * Valida pregunta y limpia respuestas vacías.
+     * Reindexa las respuestas para que correct_index apunte a la lista final.
+     *
      * @return array{prompt: string, difficulty: string|null, time_limit: int, points: int, answers: array<int, string>, correct_index: int}
      */
     private function validateQuestion(Request $request): array
     {
-        $data = $request->validate([
+        $validatedData = $request->validate([
             'prompt' => ['required', 'string', 'max:2000'],
             'difficulty' => ['nullable', 'in:easy,medium,hard'],
             'time_limit' => ['required', 'integer', 'min:5', 'max:120'],
@@ -127,43 +163,46 @@ class QuestionController extends Controller
             'correct_index' => ['required', 'integer', 'min:0', 'max:3'],
         ]);
 
-        $answers = [];
-        foreach ($data['answers'] as $index => $text) {
-            $trimmed = trim((string) $text);
-            if ($trimmed !== '') {
-                $answers[(int) $index] = $trimmed;
+        // Quita opciones vacías pero conserva el índice original para mapear la correcta.
+        $filledAnswers = [];
+        foreach ($validatedData['answers'] as $index => $text) {
+            $trimmedText = trim((string) $text);
+            if ($trimmedText !== '') {
+                $filledAnswers[(int) $index] = $trimmedText;
             }
         }
 
-        if (count($answers) < 2) {
+        if (count($filledAnswers) < 2) {
             throw ValidationException::withMessages([
                 'answers' => 'Agrega al menos 2 respuestas.',
             ]);
         }
 
-        $correctIndex = (int) $data['correct_index'];
+        $correctIndex = (int) $validatedData['correct_index'];
 
-        if (! array_key_exists($correctIndex, $answers)) {
+        if (! array_key_exists($correctIndex, $filledAnswers)) {
             throw ValidationException::withMessages([
                 'correct_index' => 'Marca como correcta una respuesta que no esté vacía.',
             ]);
         }
 
-        // Reindex so sort_order is 0..n and correct_index matches the new list.
-        $reindexed = array_values($answers);
-        $newCorrect = array_search($answers[$correctIndex], $reindexed, true);
+        // Reindexa 0..n para sort_order y recalcula el índice de la correcta.
+        $reindexedAnswers = array_values($filledAnswers);
+        $newCorrectIndex = array_search($filledAnswers[$correctIndex], $reindexedAnswers, true);
 
         return [
-            'prompt' => $data['prompt'],
-            'difficulty' => $data['difficulty'] ?? null,
-            'time_limit' => $data['time_limit'],
-            'points' => $data['points'],
-            'answers' => $reindexed,
-            'correct_index' => (int) $newCorrect,
+            'prompt' => $validatedData['prompt'],
+            'difficulty' => $validatedData['difficulty'] ?? null,
+            'time_limit' => $validatedData['time_limit'],
+            'points' => $validatedData['points'],
+            'answers' => $reindexedAnswers,
+            'correct_index' => (int) $newCorrectIndex,
         ];
     }
 
     /**
+     * Crea las filas Answer asociadas a la pregunta.
+     *
      * @param  array<int, string>  $answers
      */
     private function syncAnswers(Question $question, array $answers, int $correctIndex): void

@@ -1,12 +1,16 @@
 /**
- * Host UI — polling cada 1.5s + controles de sala.
+ * UI del anfitrión / proyector (host.js)
+ *
+ * - Polling del estado cada 1.5s (GET rooms.state)
+ * - Controles: iniciar, siguiente pregunta, finalizar
+ * - Muestra lista de jugadores, pregunta actual y marcador (mode=match)
  */
 (function () {
   const root = document.getElementById('host-app');
   if (!root) return;
 
-  const csrf = root.dataset.csrf;
-  const mode = root.dataset.mode || 'quiz';
+  const csrfToken = root.dataset.csrf;
+  const gameMode = root.dataset.mode || 'quiz';
   const urls = {
     state: root.dataset.stateUrl,
     start: root.dataset.startUrl,
@@ -14,7 +18,7 @@
     finish: root.dataset.finishUrl,
   };
 
-  const els = {
+  const elements = {
     lobby: document.getElementById('host-lobby'),
     question: document.getElementById('host-question'),
     finished: document.getElementById('host-finished'),
@@ -38,50 +42,54 @@
   let countdownTimer = null;
   let lastQuestionId = null;
 
+  /** POST a start/next/finish; devuelve el estado host o null si falló. */
   async function postAction(url) {
-    const res = await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
-        'X-CSRF-TOKEN': csrf,
+        'X-CSRF-TOKEN': csrfToken,
         'X-Requested-With': 'XMLHttpRequest',
       },
     });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
       alert(data.message || 'No se pudo completar la acción.');
       return null;
     }
-    return res.json();
+    return response.json();
   }
 
+  /** Actualiza marcador Local vs Visitante. */
   function renderMatch(match) {
-    if (!match || mode !== 'match') return;
-    if (els.matchHomeName) els.matchHomeName.textContent = match.home.name;
-    if (els.matchAwayName) els.matchAwayName.textContent = match.away.name;
-    if (els.matchHomeGoals) els.matchHomeGoals.textContent = match.home.goals;
-    if (els.matchAwayGoals) els.matchAwayGoals.textContent = match.away.goals;
+    if (!match || gameMode !== 'match') return;
+    if (elements.matchHomeName) elements.matchHomeName.textContent = match.home.name;
+    if (elements.matchAwayName) elements.matchAwayName.textContent = match.away.name;
+    if (elements.matchHomeGoals) elements.matchHomeGoals.textContent = match.home.goals;
+    if (elements.matchAwayGoals) elements.matchAwayGoals.textContent = match.away.goals;
 
-    if (els.matchWinner) {
+    if (elements.matchWinner) {
       if (match.winner === 'home') {
-        els.matchWinner.hidden = false;
-        els.matchWinner.textContent = 'Ganador: ' + match.home.name;
+        elements.matchWinner.hidden = false;
+        elements.matchWinner.textContent = 'Ganador: ' + match.home.name;
       } else if (match.winner === 'away') {
-        els.matchWinner.hidden = false;
-        els.matchWinner.textContent = 'Ganador: ' + match.away.name;
+        elements.matchWinner.hidden = false;
+        elements.matchWinner.textContent = 'Ganador: ' + match.away.name;
       } else if (match.winner === 'draw') {
-        els.matchWinner.hidden = false;
-        els.matchWinner.textContent = 'Empate';
+        elements.matchWinner.hidden = false;
+        elements.matchWinner.textContent = 'Empate';
       } else {
-        els.matchWinner.hidden = true;
-        els.matchWinner.textContent = '';
+        elements.matchWinner.hidden = true;
+        elements.matchWinner.textContent = '';
       }
     }
   }
 
   function renderScoreboard(rows) {
-    els.scoreboard.innerHTML = (rows || [])
-      .map((r, i) => `<li><span>${i + 1}. ${escapeHtml(r.nickname)}</span><strong>${r.score}</strong></li>`)
+    elements.scoreboard.innerHTML = (rows || [])
+      .map((row, index) =>
+        `<li><span>${index + 1}. ${escapeHtml(row.nickname)}</span><strong>${row.score}</strong></li>`
+      )
       .join('');
   }
 
@@ -91,68 +99,73 @@
     return '';
   }
 
+  /** Lista de jugadores en lobby (con chip de equipo si aplica). */
   function renderPlayers(players) {
-    els.playerList.innerHTML = (players || [])
-      .map((p) => {
-        const team = p.team_name || teamLabel(p.team_side);
-        const badge = team ? ` <span class="team-chip team-${p.team_side || ''}">${escapeHtml(team)}</span>` : '';
-        return `<li>${escapeHtml(p.nickname)}${badge}</li>`;
+    elements.playerList.innerHTML = (players || [])
+      .map((player) => {
+        const teamName = player.team_name || teamLabel(player.team_side);
+        const badge = teamName
+          ? ` <span class="team-chip team-${player.team_side || ''}">${escapeHtml(teamName)}</span>`
+          : '';
+        return `<li>${escapeHtml(player.nickname)}${badge}</li>`;
       })
       .join('') || '<li class="muted">Nadie aún</li>';
   }
 
   function startCountdown(startedAt, timeLimit) {
     if (countdownTimer) clearInterval(countdownTimer);
-    const start = new Date(startedAt).getTime();
-    const limit = (timeLimit || 30) * 1000;
+    const startMs = new Date(startedAt).getTime();
+    const limitMs = (timeLimit || 30) * 1000;
 
     function tick() {
-      const left = Math.max(0, Math.ceil((start + limit - Date.now()) / 1000));
-      els.countdown.textContent = left + 's';
-      if (left <= 0) clearInterval(countdownTimer);
+      const secondsLeft = Math.max(0, Math.ceil((startMs + limitMs - Date.now()) / 1000));
+      elements.countdown.textContent = secondsLeft + 's';
+      if (secondsLeft <= 0) clearInterval(countdownTimer);
     }
     tick();
     countdownTimer = setInterval(tick, 250);
   }
 
+  /** Pregunta actual + opciones (el host sí ve cuál es correcta). */
   function renderQuestion(state) {
-    const q = state.question;
-    if (!q) return;
+    const question = state.question;
+    if (!question) return;
 
-    els.prompt.textContent = q.prompt;
-    els.progress.textContent = state.question_index
+    elements.prompt.textContent = question.prompt;
+    elements.progress.textContent = state.question_index
       ? `Pregunta ${state.question_index} / ${state.total_questions}`
       : '';
-    els.answered.textContent = `${state.answered_count} / ${state.players_count} respondieron`;
+    elements.answered.textContent = `${state.answered_count} / ${state.players_count} respondieron`;
 
-    const colors = ['answer-red', 'answer-blue', 'answer-yellow', 'answer-green'];
-    els.answers.innerHTML = (q.answers || [])
-      .map((a, i) => {
-        const correct = a.is_correct ? ' is-correct-host' : '';
-        return `<div class="host-answer ${colors[i % 4]}${correct}">${escapeHtml(a.text)}</div>`;
+    const answerColors = ['answer-red', 'answer-blue', 'answer-yellow', 'answer-green'];
+    elements.answers.innerHTML = (question.answers || [])
+      .map((answer, index) => {
+        const correctClass = answer.is_correct ? ' is-correct-host' : '';
+        return `<div class="host-answer ${answerColors[index % 4]}${correctClass}">${escapeHtml(answer.text)}</div>`;
       })
       .join('');
 
-    if (q.id !== lastQuestionId) {
-      lastQuestionId = q.id;
-      startCountdown(q.started_at, q.time_limit);
+    if (question.id !== lastQuestionId) {
+      lastQuestionId = question.id;
+      startCountdown(question.started_at, question.time_limit);
     } else {
-      els.answered.textContent = `${state.answered_count} / ${state.players_count} respondieron`;
+      elements.answered.textContent = `${state.answered_count} / ${state.players_count} respondieron`;
     }
   }
 
+  /** Aplica el JSON de estado a la UI del host. */
   function applyState(state) {
     renderScoreboard(state.scoreboard);
     renderPlayers(state.players);
     renderMatch(state.match);
 
-    els.btnStart.hidden = state.status !== 'lobby';
-    els.btnNext.hidden = state.status !== 'active';
-    els.btnFinish.hidden = state.status === 'finished';
+    elements.btnStart.hidden = state.status !== 'lobby';
+    elements.btnNext.hidden = state.status !== 'active';
+    elements.btnFinish.hidden = state.status === 'finished';
 
-    els.lobby.hidden = state.status !== 'lobby';
-    els.question.hidden = state.status !== 'active';
-    els.finished.hidden = state.status !== 'finished';
+    elements.lobby.hidden = state.status !== 'lobby';
+    elements.question.hidden = state.status !== 'active';
+    elements.finished.hidden = state.status !== 'finished';
 
     if (state.status === 'active') {
       renderQuestion(state);
@@ -164,25 +177,25 @@
 
   async function poll() {
     try {
-      const res = await fetch(urls.state, {
+      const response = await fetch(urls.state, {
         headers: { Accept: 'application/json' },
         credentials: 'same-origin',
       });
-      if (res.ok) applyState(await res.json());
-    } catch (e) {
-      // silencioso en polling
+      if (response.ok) applyState(await response.json());
+    } catch (error) {
+      // Silencioso en polling.
     }
   }
 
-  els.btnStart.addEventListener('click', async () => {
+  elements.btnStart.addEventListener('click', async () => {
     const state = await postAction(urls.start);
     if (state) applyState(state);
   });
-  els.btnNext.addEventListener('click', async () => {
+  elements.btnNext.addEventListener('click', async () => {
     const state = await postAction(urls.next);
     if (state) applyState(state);
   });
-  els.btnFinish.addEventListener('click', async () => {
+  elements.btnFinish.addEventListener('click', async () => {
     if (!confirm('¿Finalizar el partido?')) return;
     const state = await postAction(urls.finish);
     if (state) applyState(state);

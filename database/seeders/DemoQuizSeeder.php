@@ -9,15 +9,21 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
+/**
+ * Sección demo de matemáticas con 4 preguntas de sumas/restas/multiplicación.
+ *
+ * Solo corre si existen el maestro demo, la materia y el grado 3° Primaria.
+ * Si la sección ya tiene preguntas, no las duplica.
+ */
 class DemoQuizSeeder extends Seeder
 {
     public function run(): void
     {
         $teacher = User::query()->where('email', 'maestro@quizgol.test')->first();
-        $math = Subject::query()->where('slug', 'matematicas')->first();
-        $grade = Grade::query()->where('slug', '3-primaria')->first();
+        $mathSubject = Subject::query()->where('slug', 'matematicas')->first();
+        $thirdGrade = Grade::query()->where('slug', '3-primaria')->first();
 
-        if (! $teacher || ! $math || ! $grade) {
+        if (! $teacher || ! $mathSubject || ! $thirdGrade) {
             return;
         }
 
@@ -27,16 +33,17 @@ class DemoQuizSeeder extends Seeder
                 'title' => 'Sumas y restas — Demo',
             ],
             [
-                'subject_id' => $math->id,
-                'grade_id' => $grade->id,
+                'subject_id' => $mathSubject->id,
+                'grade_id' => $thirdGrade->id,
             ]
         );
 
+        // Evita duplicar el banco si se vuelve a ejecutar el seeder.
         if ($section->questions()->exists()) {
             return;
         }
 
-        $bank = [
+        $questionBank = [
             [
                 'prompt' => '¿Cuánto es 12 + 8?',
                 'difficulty' => 'easy',
@@ -63,7 +70,7 @@ class DemoQuizSeeder extends Seeder
             ],
         ];
 
-        foreach ($bank as $index => $item) {
+        foreach ($questionBank as $index => $item) {
             $question = $section->questions()->create([
                 'prompt' => $item['prompt'],
                 'type' => Question::TYPE_MULTIPLE_CHOICE,
@@ -73,9 +80,9 @@ class DemoQuizSeeder extends Seeder
                 'sort_order' => $index,
             ]);
 
-            foreach ($item['answers'] as $answerIndex => $text) {
+            foreach ($item['answers'] as $answerIndex => $answerText) {
                 $question->answers()->create([
-                    'text' => $text,
+                    'text' => $answerText,
                     'is_correct' => $answerIndex === $item['correct'],
                     'sort_order' => $answerIndex,
                 ]);

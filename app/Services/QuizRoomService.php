@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Answer;
 use App\Models\PlayerAnswer;
+use App\Models\Question;
 use App\Models\Room;
 use App\Models\RoomPlayer;
 use App\Models\Section;
@@ -12,8 +13,17 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
+/**
+ * Lógica principal del quiz en vivo (lobby → preguntas → ranking).
+ *
+ * El modo partido reutiliza este flujo; MatchGameService solo agrega equipos y goles.
+ */
 class QuizRoomService
 {
+    public function __construct(private MatchGameService $matchGames)
+    {
+    }
+
     /**
      * Crea una sala en lobby a partir de una sección con al menos 1 pregunta.
      */
@@ -26,9 +36,9 @@ class QuizRoomService
         }
 
         return Room::query()->create([
-            'code' => $this->generateUniqueCode(),
-            'mode' => 'quiz',
-            'status' => 'lobby',
+            'code' => Room::generateUniqueCode(),
+            'mode' => Room::MODE_QUIZ,
+            'status' => Room::STATUS_LOBBY,
             'host_id' => $host->id,
             'section_id' => $section->id,
             'current_question_id' => null,
@@ -37,32 +47,32 @@ class QuizRoomService
     }
 
     /**
-     * Inicia el juego: primera pregunta por sort_order.
+     * Inicia el juego mostrando la primera pregunta (por sort_order).
      */
     public function start(Room $room): void
     {
-        if ($room->status !== 'lobby') {
+        if (! $room->isLobby()) {
             throw new RuntimeException('La sala solo se puede iniciar desde el lobby.');
         }
 
-        $first = $room->section
+        $firstQuestion = $room->section
             ->questions()
             ->orderBy('sort_order')
             ->orderBy('id')
             ->first();
 
-        if (! $first) {
+        if (! $firstQuestion) {
             throw new RuntimeException('La sección no tiene preguntas.');
         }
 
         $room->update([
-            'status' => 'active',
-            'current_question_id' => $first->id,
+            'status' => Room::STATUS_ACTIVE,
+            'current_question_id' => $firstQuestion->id,
             'question_started_at' => now(),
         ]);
 
-        if ($room->mode === 'match') {
-            app(MatchGameService::class)->syncMatchStatus($room->fresh());
+        if ($room->isMatchMode()) {
+            $this->matchGames->syncMatchStatus($room->fresh());
         }
     }
 
@@ -71,59 +81,67 @@ class QuizRoomService
      */
     public function nextQuestion(Room $room): void
     {
-        if ($room->status !== 'active') {
+        if (! $room->isActive()) {
             throw new RuntimeException('La sala no está activa.');
         }
 
-        $questions = $room->section
+        $orderedQuestions = $room->section
             ->questions()
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
 
-        $currentIndex = $questions->search(
-            fn ($q) => (int) $q->id === (int) $room->current_question_id
+        $currentIndex = $orderedQuestions->search(
+            fn (Question $question) => (int) $question->id === (int) $room->current_question_id
         );
 
-        $next = $currentIndex === false ? null : $questions->get($currentIndex + 1);
+        $nextQuestion = $currentIndex === false
+            ? null
+            : $orderedQuestions->get($currentIndex + 1);
 
-        if (! $next) {
+        if (! $nextQuestion) {
             $this->finish($room);
 
             return;
         }
 
         $room->update([
-            'current_question_id' => $next->id,
+            'current_question_id' => $nextQuestion->id,
             'question_started_at' => now(),
         ]);
     }
 
+    /**
+     * Marca la sala como finalizada y limpia la pregunta actual.
+     */
     public function finish(Room $room): void
     {
         $room->update([
-            'status' => 'finished',
+            'status' => Room::STATUS_FINISHED,
             'current_question_id' => null,
             'question_started_at' => null,
         ]);
 
-        if ($room->mode === 'match') {
-            app(MatchGameService::class)->syncMatchStatus($room->fresh());
+        if ($room->isMatchMode()) {
+            $this->matchGames->syncMatchStatus($room->fresh());
         }
     }
 
     /**
-     * Scoring (MVP):
-     *   base   = question.points (default 1000)
-     *   elapsed = now - question_started_at (seconds)
-     *   bonus  = max(0, (time_limit - elapsed) / time_limit) * 500
-     *   points = is_correct ? (int)(base * 0.5 + bonus) : 0
+     * Registra la respuesta de un jugador y calcula puntos (MVP).
      *
-     * Solo una respuesta por jugador por pregunta.
+     * Fórmula si acierta:
+     *   base   = question.points (default 1000)
+     *   elapsed = segundos desde question_started_at
+     *   bonus  = max(0, (time_limit - elapsed) / time_limit) * 500
+     *   points = (int)(base * 0.5 + bonus)
+     *
+     * Si falla: 0 puntos.
+     * Solo se permite una respuesta por jugador por pregunta.
      */
     public function submitAnswer(RoomPlayer $player, Room $room, int $answerId): PlayerAnswer
     {
-        if ($room->status !== 'active' || ! $room->current_question_id) {
+        if (! $room->isActive() || ! $room->current_question_id) {
             throw ValidationException::withMessages([
                 'answer_id' => 'No hay una pregunta activa.',
             ]);
@@ -135,54 +153,54 @@ class QuizRoomService
             ]);
         }
 
-        $already = PlayerAnswer::query()
+        $alreadyAnswered = PlayerAnswer::query()
             ->where('room_player_id', $player->id)
             ->where('question_id', $room->current_question_id)
             ->exists();
 
-        if ($already) {
+        if ($alreadyAnswered) {
             throw ValidationException::withMessages([
                 'answer_id' => 'Ya respondiste esta pregunta.',
             ]);
         }
 
-        $answer = Answer::query()->find($answerId);
+        $selectedAnswer = Answer::query()->find($answerId);
 
-        if (! $answer || (int) $answer->question_id !== (int) $room->current_question_id) {
+        if (! $selectedAnswer || (int) $selectedAnswer->question_id !== (int) $room->current_question_id) {
             throw ValidationException::withMessages([
                 'answer_id' => 'La respuesta no corresponde a la pregunta actual.',
             ]);
         }
 
-        $question = $room->currentQuestion;
-        $isCorrect = (bool) $answer->is_correct;
-        $points = 0;
+        $currentQuestion = $room->currentQuestion;
+        $isCorrect = (bool) $selectedAnswer->is_correct;
+        $pointsAwarded = 0;
 
         if ($isCorrect) {
-            $base = (int) ($question->points ?: 1000);
-            $timeLimit = max(1, (int) ($question->time_limit ?: 30));
+            $basePoints = (int) ($currentQuestion->points ?: 1000);
+            $timeLimitSeconds = max(1, (int) ($currentQuestion->time_limit ?: 30));
             // Segundos desde que arrancó la pregunta (siempre >= 0).
-            $elapsed = max(0, (int) $room->question_started_at->diffInSeconds(now()));
-            $bonus = max(0, ($timeLimit - $elapsed) / $timeLimit) * 500;
-            $points = (int) ($base * 0.5 + $bonus);
+            $elapsedSeconds = max(0, (int) $room->question_started_at->diffInSeconds(now()));
+            $speedBonus = max(0, ($timeLimitSeconds - $elapsedSeconds) / $timeLimitSeconds) * 500;
+            $pointsAwarded = (int) ($basePoints * 0.5 + $speedBonus);
         }
 
         $playerAnswer = PlayerAnswer::query()->create([
             'room_player_id' => $player->id,
-            'question_id' => $question->id,
-            'answer_id' => $answer->id,
+            'question_id' => $currentQuestion->id,
+            'answer_id' => $selectedAnswer->id,
             'is_correct' => $isCorrect,
-            'points_awarded' => $points,
+            'points_awarded' => $pointsAwarded,
             'answered_at' => now(),
         ]);
 
-        if ($points > 0) {
-            $player->increment('score', $points);
+        if ($pointsAwarded > 0) {
+            $player->increment('score', $pointsAwarded);
         }
 
         // Modo partido: cada acierto suma 1 gol al equipo del jugador.
-        if ($room->mode === 'match' && $isCorrect) {
-            app(MatchGameService::class)->awardGoal($player);
+        if ($room->isMatchMode() && $isCorrect) {
+            $this->matchGames->awardGoal($player);
         }
 
         return $playerAnswer;
@@ -190,30 +208,32 @@ class QuizRoomService
 
     /**
      * Estado JSON para el jugador (polling).
-     * No incluye is_correct en las opciones de respuesta.
+     * No incluye is_correct en las opciones hasta después de responder.
+     *
+     * @return array<string, mixed>
      */
     public function buildPlayerState(Room $room, ?RoomPlayer $player): array
     {
         $room->loadMissing([
             'players.team',
-            'currentQuestion.answers' => fn ($q) => $q->orderBy('sort_order')->orderBy('id'),
+            'currentQuestion.answers' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
         ]);
 
-        $scoreboard = $this->scoreboard($room);
+        $scoreboard = $this->buildScoreboard($room);
         $myAnswer = null;
         $phase = $this->resolvePhase($room, $player, $myAnswer);
-        $reveal = $phase === 'reveal';
+        $shouldReveal = $phase === 'reveal';
 
         $questionPayload = null;
-        if ($room->status === 'active' && $room->currentQuestion) {
+        if ($room->isActive() && $room->currentQuestion) {
             $questionPayload = [
                 'id' => $room->currentQuestion->id,
                 'prompt' => $room->currentQuestion->prompt,
                 'time_limit' => $room->currentQuestion->time_limit,
                 'started_at' => optional($room->question_started_at)?->toIso8601String(),
-                'answers' => $room->currentQuestion->answers->map(fn (Answer $a) => [
-                    'id' => $a->id,
-                    'text' => $a->text,
+                'answers' => $room->currentQuestion->answers->map(fn (Answer $answer) => [
+                    'id' => $answer->id,
+                    'text' => $answer->text,
                 ])->values()->all(),
             ];
         }
@@ -225,32 +245,33 @@ class QuizRoomService
             'players' => $room->players
                 ->sortByDesc('score')
                 ->values()
-                ->map(fn (RoomPlayer $p) => [
-                    'nickname' => $p->nickname,
-                    'score' => $p->score,
-                    'team_side' => $p->team?->side,
+                ->map(fn (RoomPlayer $roomPlayer) => [
+                    'nickname' => $roomPlayer->nickname,
+                    'score' => $roomPlayer->score,
+                    'team_side' => $roomPlayer->team?->side,
                 ])
                 ->all(),
             'question' => $questionPayload,
             'phase' => $phase,
             'my_answer' => $myAnswer,
             'scoreboard' => $scoreboard,
-            'reveal' => $reveal,
+            'reveal' => $shouldReveal,
             'nickname' => $player?->nickname,
             'my_score' => $player?->score ?? 0,
         ];
 
-        if ($room->mode === 'match') {
-            $matchService = app(MatchGameService::class);
-            $state['match'] = $matchService->buildMatchPayload($room);
-            $state['my_team'] = $matchService->playerTeamInfo($player);
+        if ($room->isMatchMode()) {
+            $state['match'] = $this->matchGames->buildMatchPayload($room);
+            $state['my_team'] = $this->matchGames->playerTeamInfo($player);
         }
 
         return $state;
     }
 
     /**
-     * Estado JSON para el anfitrión (incluye is_correct al revelar / siempre en host).
+     * Estado JSON para el anfitrión (incluye is_correct para proyectar).
+     *
+     * @return array<string, mixed>
      */
     public function buildHostState(Room $room): array
     {
@@ -258,7 +279,7 @@ class QuizRoomService
             'section.subject',
             'section.grade',
             'players.team',
-            'currentQuestion.answers' => fn ($q) => $q->orderBy('sort_order')->orderBy('id'),
+            'currentQuestion.answers' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
         ]);
 
         $answeredCount = 0;
@@ -270,40 +291,45 @@ class QuizRoomService
         }
 
         $phase = match ($room->status) {
-            'lobby' => 'lobby',
-            'finished' => 'finished',
+            Room::STATUS_LOBBY => 'lobby',
+            Room::STATUS_FINISHED => 'finished',
             default => 'question',
         };
 
-        // El host siempre ve la respuesta correcta (útil para proyectar al final de la pregunta).
-        $showCorrect = $room->status === 'active';
+        // El host siempre ve la respuesta correcta (útil para proyectar).
+        $showCorrectAnswers = $room->isActive();
 
         $questionPayload = null;
-        if ($room->status === 'active' && $room->currentQuestion) {
+        if ($room->isActive() && $room->currentQuestion) {
             $questionPayload = [
                 'id' => $room->currentQuestion->id,
                 'prompt' => $room->currentQuestion->prompt,
                 'time_limit' => $room->currentQuestion->time_limit,
                 'difficulty' => $room->currentQuestion->difficulty,
                 'started_at' => optional($room->question_started_at)?->toIso8601String(),
-                'answers' => $room->currentQuestion->answers->map(fn (Answer $a) => [
-                    'id' => $a->id,
-                    'text' => $a->text,
-                    'is_correct' => $showCorrect ? (bool) $a->is_correct : null,
+                'answers' => $room->currentQuestion->answers->map(fn (Answer $answer) => [
+                    'id' => $answer->id,
+                    'text' => $answer->text,
+                    'is_correct' => $showCorrectAnswers ? (bool) $answer->is_correct : null,
                 ])->values()->all(),
             ];
         }
 
         $totalQuestions = $room->section->questions()->count();
-        $currentIndex = null;
+        $currentQuestionNumber = null;
+
         if ($room->current_question_id) {
-            $orderedIds = $room->section
+            $orderedQuestionIds = $room->section
                 ->questions()
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->pluck('id');
-            $idx = $orderedIds->search(fn ($id) => (int) $id === (int) $room->current_question_id);
-            $currentIndex = $idx === false ? null : $idx + 1;
+
+            $foundIndex = $orderedQuestionIds->search(
+                fn ($questionId) => (int) $questionId === (int) $room->current_question_id
+            );
+
+            $currentQuestionNumber = $foundIndex === false ? null : $foundIndex + 1;
         }
 
         $state = [
@@ -319,47 +345,36 @@ class QuizRoomService
             'players' => $room->players
                 ->sortByDesc('score')
                 ->values()
-                ->map(fn (RoomPlayer $p) => [
-                    'id' => $p->id,
-                    'nickname' => $p->nickname,
-                    'score' => $p->score,
-                    'team_side' => $p->team?->side,
-                    'team_name' => $p->team?->name,
+                ->map(fn (RoomPlayer $roomPlayer) => [
+                    'id' => $roomPlayer->id,
+                    'nickname' => $roomPlayer->nickname,
+                    'score' => $roomPlayer->score,
+                    'team_side' => $roomPlayer->team?->side,
+                    'team_name' => $roomPlayer->team?->name,
                 ])
                 ->all(),
             'question' => $questionPayload,
             'phase' => $phase,
             'answered_count' => $answeredCount,
-            'scoreboard' => $this->scoreboard($room),
-            'reveal' => $showCorrect,
-            'question_index' => $currentIndex,
+            'scoreboard' => $this->buildScoreboard($room),
+            'reveal' => $showCorrectAnswers,
+            'question_index' => $currentQuestionNumber,
             'total_questions' => $totalQuestions,
         ];
 
-        if ($room->mode === 'match') {
-            $state['match'] = app(MatchGameService::class)->buildMatchPayload($room);
+        if ($room->isMatchMode()) {
+            $state['match'] = $this->matchGames->buildMatchPayload($room);
         }
 
         return $state;
     }
 
-    public function generateUniqueCode(int $length = 4): string
-    {
-        $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-
-        do {
-            $code = '';
-            for ($i = 0; $i < $length; $i++) {
-                $code .= $chars[random_int(0, strlen($chars) - 1)];
-            }
-        } while (Room::query()->where('code', $code)->exists());
-
-        return $code;
-    }
-
+    /**
+     * Crea un jugador en modo quiz (sin equipo).
+     */
     public function createPlayer(Room $room, string $nickname): RoomPlayer
     {
-        if (! in_array($room->status, ['lobby', 'active'], true)) {
+        if (! in_array($room->status, [Room::STATUS_LOBBY, Room::STATUS_ACTIVE], true)) {
             throw ValidationException::withMessages([
                 'code' => 'Esta sala ya terminó.',
             ]);
@@ -367,8 +382,8 @@ class QuizRoomService
 
         $nickname = trim($nickname);
 
-        $exists = $room->players()->where('nickname', $nickname)->exists();
-        if ($exists) {
+        $nicknameAlreadyTaken = $room->players()->where('nickname', $nickname)->exists();
+        if ($nicknameAlreadyTaken) {
             throw ValidationException::withMessages([
                 'nickname' => 'Ese apodo ya está en uso en esta sala.',
             ]);
@@ -381,40 +396,52 @@ class QuizRoomService
         ]);
     }
 
-    private function scoreboard(Room $room): array
+    /**
+     * Ranking de jugadores ordenado por puntaje (mayor primero).
+     *
+     * @return array<int, array{nickname: string, score: int}>
+     */
+    private function buildScoreboard(Room $room): array
     {
         return $room->players
             ->sortByDesc('score')
             ->values()
-            ->map(fn (RoomPlayer $p) => [
-                'nickname' => $p->nickname,
-                'score' => $p->score,
+            ->map(fn (RoomPlayer $roomPlayer) => [
+                'nickname' => $roomPlayer->nickname,
+                'score' => $roomPlayer->score,
             ])
             ->all();
     }
 
+    /**
+     * Decide la fase de UI del jugador: lobby | question | reveal | finished.
+     *
+     * Si ya respondió la pregunta actual, rellena $myAnswer y devuelve "reveal".
+     *
+     * @param  array{answer_id: int, is_correct: bool, points_awarded: int}|null  $myAnswer
+     */
     private function resolvePhase(Room $room, ?RoomPlayer $player, ?array &$myAnswer): string
     {
-        if ($room->status === 'lobby') {
+        if ($room->isLobby()) {
             return 'lobby';
         }
 
-        if ($room->status === 'finished') {
+        if ($room->isFinished()) {
             return 'finished';
         }
 
-        // active
+        // Sala activa: si el jugador ya contestó, mostramos resultado.
         if ($player && $room->current_question_id) {
-            $pa = PlayerAnswer::query()
+            $existingAnswer = PlayerAnswer::query()
                 ->where('room_player_id', $player->id)
                 ->where('question_id', $room->current_question_id)
                 ->first();
 
-            if ($pa) {
+            if ($existingAnswer) {
                 $myAnswer = [
-                    'answer_id' => $pa->answer_id,
-                    'is_correct' => (bool) $pa->is_correct,
-                    'points_awarded' => $pa->points_awarded,
+                    'answer_id' => $existingAnswer->answer_id,
+                    'is_correct' => (bool) $existingAnswer->is_correct,
+                    'points_awarded' => $existingAnswer->points_awarded,
                 ];
 
                 return 'reveal';

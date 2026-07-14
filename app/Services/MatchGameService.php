@@ -14,15 +14,13 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
- * Reglas del modo partido (2 equipos).
- * Reutiliza el flujo de preguntas de QuizRoomService; aquí solo equipos y goles.
+ * Reglas del modo partido (2 equipos: Local y Visitante).
+ *
+ * Reutiliza el flujo de preguntas de QuizRoomService;
+ * aquí solo se crean equipos, se asignan jugadores y se suman goles.
  */
 class MatchGameService
 {
-    public function __construct(private QuizRoomService $quizRooms)
-    {
-    }
-
     /**
      * Crea sala mode=match + 2 equipos (Local / Visitante) + fila MatchGame.
      */
@@ -36,35 +34,35 @@ class MatchGameService
 
         return DB::transaction(function () use ($host, $section) {
             $room = Room::query()->create([
-                'code' => $this->quizRooms->generateUniqueCode(),
-                'mode' => 'match',
-                'status' => 'lobby',
+                'code' => Room::generateUniqueCode(),
+                'mode' => Room::MODE_MATCH,
+                'status' => Room::STATUS_LOBBY,
                 'host_id' => $host->id,
                 'section_id' => $section->id,
                 'current_question_id' => null,
                 'question_started_at' => null,
             ]);
 
-            $home = Team::query()->create([
+            $homeTeam = Team::query()->create([
                 'room_id' => $room->id,
                 'name' => 'Local',
-                'side' => 'home',
+                'side' => Team::SIDE_HOME,
                 'goals' => 0,
             ]);
 
-            $away = Team::query()->create([
+            $awayTeam = Team::query()->create([
                 'room_id' => $room->id,
                 'name' => 'Visitante',
-                'side' => 'away',
+                'side' => Team::SIDE_AWAY,
                 'goals' => 0,
             ]);
 
             MatchGame::query()->create([
                 'room_id' => $room->id,
-                'home_team_id' => $home->id,
-                'away_team_id' => $away->id,
+                'home_team_id' => $homeTeam->id,
+                'away_team_id' => $awayTeam->id,
                 'turn_team_id' => null,
-                'status' => 'lobby',
+                'status' => Room::STATUS_LOBBY,
             ]);
 
             return $room;
@@ -72,26 +70,29 @@ class MatchGameService
     }
 
     /**
-     * Une un jugador a un equipo (home|away o team_id).
+     * Une un jugador a un equipo (por side home|away o por team_id).
      */
-    public function createPlayer(Room $room, string $nickname, ?string $teamSide = null, ?int $teamId = null): RoomPlayer
-    {
-        if ($room->mode !== 'match') {
+    public function createPlayer(
+        Room $room,
+        string $nickname,
+        ?string $teamSide = null,
+        ?int $teamId = null,
+    ): RoomPlayer {
+        if (! $room->isMatchMode()) {
             throw new RuntimeException('createPlayer de MatchGameService solo aplica a mode=match.');
         }
 
-        if (! in_array($room->status, ['lobby', 'active'], true)) {
+        if (! in_array($room->status, [Room::STATUS_LOBBY, Room::STATUS_ACTIVE], true)) {
             throw ValidationException::withMessages([
                 'code' => 'Esta sala ya terminó.',
             ]);
         }
 
         $team = $this->resolveTeam($room, $teamSide, $teamId);
-
         $nickname = trim($nickname);
 
-        $exists = $room->players()->where('nickname', $nickname)->exists();
-        if ($exists) {
+        $nicknameAlreadyTaken = $room->players()->where('nickname', $nickname)->exists();
+        if ($nicknameAlreadyTaken) {
             throw ValidationException::withMessages([
                 'nickname' => 'Ese apodo ya está en uso en esta sala.',
             ]);
@@ -106,7 +107,7 @@ class MatchGameService
     }
 
     /**
-     * +1 gol al equipo del jugador (respuesta correcta).
+     * Suma 1 gol al equipo del jugador (cuando acierta una pregunta).
      */
     public function awardGoal(RoomPlayer $player): void
     {
@@ -118,24 +119,24 @@ class MatchGameService
     }
 
     /**
-     * Sincroniza el status de MatchGame con el de la Room.
+     * Copia el status de la Room al MatchGame (lobby/active/finished).
      */
     public function syncMatchStatus(Room $room): void
     {
-        if ($room->mode !== 'match') {
+        if (! $room->isMatchMode()) {
             return;
         }
 
-        $match = $room->matchGame;
-        if (! $match) {
+        $matchGame = $room->matchGame;
+        if (! $matchGame) {
             return;
         }
 
-        $match->update(['status' => $room->status]);
+        $matchGame->update(['status' => $room->status]);
     }
 
     /**
-     * Bloque "match" para el JSON de host/jugador.
+     * Bloque "match" para el JSON de host/jugador (marcador y ganador).
      *
      * @return array{home: array{name: string, goals: int}, away: array{name: string, goals: int}, winner: string|null}
      */
@@ -143,18 +144,18 @@ class MatchGameService
     {
         $room->loadMissing(['teams', 'matchGame']);
 
-        $home = $room->teams->firstWhere('side', 'home');
-        $away = $room->teams->firstWhere('side', 'away');
+        $homeTeam = $room->teams->firstWhere('side', Team::SIDE_HOME);
+        $awayTeam = $room->teams->firstWhere('side', Team::SIDE_AWAY);
 
-        $homeGoals = (int) ($home?->goals ?? 0);
-        $awayGoals = (int) ($away?->goals ?? 0);
+        $homeGoals = (int) ($homeTeam?->goals ?? 0);
+        $awayGoals = (int) ($awayTeam?->goals ?? 0);
 
         $winner = null;
-        if ($room->status === 'finished') {
+        if ($room->isFinished()) {
             if ($homeGoals > $awayGoals) {
-                $winner = 'home';
+                $winner = Team::SIDE_HOME;
             } elseif ($awayGoals > $homeGoals) {
-                $winner = 'away';
+                $winner = Team::SIDE_AWAY;
             } else {
                 $winner = 'draw';
             }
@@ -162,11 +163,11 @@ class MatchGameService
 
         return [
             'home' => [
-                'name' => $home?->name ?? 'Local',
+                'name' => $homeTeam?->name ?? 'Local',
                 'goals' => $homeGoals,
             ],
             'away' => [
-                'name' => $away?->name ?? 'Visitante',
+                'name' => $awayTeam?->name ?? 'Visitante',
                 'goals' => $awayGoals,
             ],
             'winner' => $winner,
@@ -174,7 +175,7 @@ class MatchGameService
     }
 
     /**
-     * Datos del equipo del jugador (para UI).
+     * Datos del equipo del jugador para la UI.
      *
      * @return array{id: int, name: string, side: string}|null
      */
@@ -197,6 +198,9 @@ class MatchGameService
         ];
     }
 
+    /**
+     * Resuelve el equipo por id o por side (home/away).
+     */
     private function resolveTeam(Room $room, ?string $teamSide, ?int $teamId): Team
     {
         $room->loadMissing('teams');
@@ -212,14 +216,14 @@ class MatchGameService
             return $team;
         }
 
-        $side = strtolower(trim((string) $teamSide));
-        if (! in_array($side, ['home', 'away'], true)) {
+        $normalizedSide = strtolower(trim((string) $teamSide));
+        if (! in_array($normalizedSide, [Team::SIDE_HOME, Team::SIDE_AWAY], true)) {
             throw ValidationException::withMessages([
                 'team' => 'En modo partido debes elegir equipo: Local (home) o Visitante (away).',
             ]);
         }
 
-        $team = $room->teams->firstWhere('side', $side);
+        $team = $room->teams->firstWhere('side', $normalizedSide);
         if (! $team) {
             throw ValidationException::withMessages([
                 'team' => 'No se encontraron los equipos de esta sala.',

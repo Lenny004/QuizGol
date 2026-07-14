@@ -1,3 +1,16 @@
+/*
+ * Estilos principales de QuizGol (layout.quizgol).
+ *
+ * Secciones aproximadas del archivo:
+ * 1) Tokens CSS (:root) — colores, tipografía, radio, sombra
+ * 2) Reset / base (body, tipografía, enlaces)
+ * 3) Layout y navegación
+ * 4) Formularios y botones
+ * 5) Dashboard / secciones / preguntas (área maestro)
+ * 6) Host (proyector) y Play (jugador)
+ * 7) Respuestas de colores, marcador, feedback gol/fallo
+ */
+
 :root {
   --color-pitch: #0b3d2e;
   --color-pitch-light: #145c43;

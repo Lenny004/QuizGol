@@ -8,17 +8,19 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
+ * Factory de User para tests y seeds.
+ *
+ * Estados útiles: ->teacher(), ->admin(), ->unverified()
+ *
  * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
-    /**
-     * The current password being used by the factory.
-     */
+    /** Password cacheado para no hashear en cada instancia. */
     protected static ?string $password;
 
     /**
-     * Define the model's default state.
+     * Estado por defecto: maestro verificado con password "password".
      *
      * @return array<string, mixed>
      */
@@ -30,13 +32,11 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
-            'role' => 'teacher',
+            'role' => User::ROLE_TEACHER,
         ];
     }
 
-    /**
-     * Indicate that the model's email address should be unverified.
-     */
+    /** Usuario sin email verificado. */
     public function unverified(): static
     {
         return $this->state(fn (array $attributes) => [
@@ -44,17 +44,19 @@ class UserFactory extends Factory
         ]);
     }
 
+    /** Usuario con rol teacher. */
     public function teacher(): static
     {
         return $this->state(fn (array $attributes) => [
-            'role' => 'teacher',
+            'role' => User::ROLE_TEACHER,
         ]);
     }
 
+    /** Usuario con rol admin. */
     public function admin(): static
     {
         return $this->state(fn (array $attributes) => [
-            'role' => 'admin',
+            'role' => User::ROLE_ADMIN,
         ]);
     }
 }

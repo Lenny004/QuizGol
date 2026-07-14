@@ -6,6 +6,9 @@ use App\Models\Grade;
 use App\Models\Subject;
 use Illuminate\Database\Seeder;
 
+/**
+ * Carga materias base y las vincula a todos los grados existentes.
+ */
 class SubjectSeeder extends Seeder
 {
     public function run(): void
@@ -28,6 +31,7 @@ class SubjectSeeder extends Seeder
                 ]
             );
 
+            // En el MVP cada materia está disponible en todos los grados.
             if ($gradeIds->isNotEmpty()) {
                 $subject->grades()->sync($gradeIds);
             }

@@ -4,10 +4,16 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Tablas del dominio QuizGol:
+ * catálogo (subjects, grades) → contenido (sections, questions, answers)
+ * → juego en vivo (rooms, teams, room_players, player_answers, matches).
+ */
 return new class extends Migration
 {
     public function up(): void
     {
+        // --- Catálogo escolar ---
         Schema::create('subjects', function (Blueprint $table) {
             $table->id();
             $table->string('name');
@@ -25,6 +31,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        // Qué materias se ofrecen en cada grado.
         Schema::create('subject_grade', function (Blueprint $table) {
             $table->id();
             $table->foreignId('subject_id')->constrained()->cascadeOnDelete();
@@ -33,6 +40,7 @@ return new class extends Migration
             $table->unique(['subject_id', 'grade_id']);
         });
 
+        // --- Contenido del maestro ---
         Schema::create('sections', function (Blueprint $table) {
             $table->id();
             $table->foreignId('subject_id')->constrained()->cascadeOnDelete();
@@ -49,9 +57,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('section_id')->constrained()->cascadeOnDelete();
             $table->text('prompt');
-            $table->string('image_path')->nullable();
+            $table->string('image_path')->nullable(); // reservado para imágenes futuras
             $table->string('type', 30)->default('multiple_choice');
-            $table->string('difficulty', 20)->nullable();
+            $table->string('difficulty', 20)->nullable(); // easy|medium|hard
             $table->unsignedInteger('time_limit')->default(30);
             $table->unsignedInteger('points')->default(1000);
             $table->unsignedInteger('sort_order')->default(0);
@@ -70,11 +78,12 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        // --- Juego en vivo ---
         Schema::create('rooms', function (Blueprint $table) {
             $table->id();
             $table->string('code', 8)->unique();
-            $table->string('mode', 20)->default('quiz');
-            $table->string('status', 20)->default('lobby');
+            $table->string('mode', 20)->default('quiz'); // quiz | match
+            $table->string('status', 20)->default('lobby'); // lobby | active | finished
             $table->foreignId('host_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('section_id')->constrained()->cascadeOnDelete();
             $table->foreignId('current_question_id')->nullable()->constrained('questions')->nullOnDelete();
@@ -86,7 +95,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('room_id')->constrained()->cascadeOnDelete();
             $table->string('name');
-            $table->string('side', 10);
+            $table->string('side', 10); // home | away
             $table->integer('goals')->default(0);
             $table->timestamps();
         });
@@ -97,7 +106,7 @@ return new class extends Migration
             $table->string('nickname');
             $table->integer('score')->default(0);
             $table->foreignId('team_id')->nullable()->constrained('teams')->nullOnDelete();
-            $table->string('session_token')->unique();
+            $table->string('session_token')->unique(); // cookie quizgol_player
             $table->timestamps();
             $table->unique(['room_id', 'nickname']);
         });
@@ -111,15 +120,17 @@ return new class extends Migration
             $table->integer('points_awarded')->default(0);
             $table->timestamp('answered_at');
             $table->timestamps();
+            // Un jugador solo puede responder una vez cada pregunta.
             $table->unique(['room_player_id', 'question_id']);
         });
 
+        // Modelo Eloquent: MatchGame (la tabla se llama matches).
         Schema::create('matches', function (Blueprint $table) {
             $table->id();
             $table->foreignId('room_id')->unique()->constrained()->cascadeOnDelete();
             $table->foreignId('home_team_id')->constrained('teams')->cascadeOnDelete();
             $table->foreignId('away_team_id')->constrained('teams')->cascadeOnDelete();
-            $table->foreignId('turn_team_id')->nullable()->constrained('teams')->nullOnDelete();
+            $table->foreignId('turn_team_id')->nullable()->constrained('teams')->nullOnDelete(); // futuro
             $table->string('status', 20)->default('lobby');
             $table->timestamps();
         });
@@ -127,6 +138,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Orden inverso por FKs.
         Schema::dropIfExists('matches');
         Schema::dropIfExists('player_answers');
         Schema::dropIfExists('room_players');

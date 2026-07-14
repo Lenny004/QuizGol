@@ -10,12 +10,20 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
+/**
+ * Pantalla del jugador y endpoints de estado / respuesta (polling).
+ *
+ * El jugador se identifica con la cookie quizgol_player (= session_token).
+ */
 class PlayController extends Controller
 {
     public function __construct(private QuizRoomService $quizRooms)
     {
     }
 
+    /**
+     * Vista del juego; exige cookie de jugador válida para esa sala.
+     */
     public function show(string $code): View
     {
         $room = $this->findRoom($code);
@@ -29,6 +37,9 @@ class PlayController extends Controller
         ]);
     }
 
+    /**
+     * JSON de estado para play.js (cada 1.5s).
+     */
     public function state(string $code): JsonResponse
     {
         $room = $this->findRoom($code);
@@ -39,6 +50,9 @@ class PlayController extends Controller
         );
     }
 
+    /**
+     * Envía la respuesta del jugador a la pregunta actual.
+     */
     public function answer(Request $request, string $code): JsonResponse
     {
         $room = $this->findRoom($code);
@@ -48,14 +62,14 @@ class PlayController extends Controller
             return response()->json(['message' => 'Jugador no identificado.'], 403);
         }
 
-        $data = $request->validate([
+        $validatedData = $request->validate([
             'answer_id' => ['required', 'integer', 'exists:answers,id'],
         ]);
 
         $playerAnswer = $this->quizRooms->submitAnswer(
             $player,
             $room,
-            (int) $data['answer_id']
+            (int) $validatedData['answer_id']
         );
 
         return response()->json([
@@ -70,13 +84,13 @@ class PlayController extends Controller
     }
 
     /**
-     * Identifica al jugador por cookie quizgol_player (= session_token).
+     * Busca al jugador por cookie quizgol_player en la sala del código dado.
      */
-    protected function resolvePlayer(string $code): ?RoomPlayer
+    private function resolvePlayer(string $code): ?RoomPlayer
     {
-        $token = request()->cookie('quizgol_player');
+        $sessionToken = request()->cookie('quizgol_player');
 
-        if (! $token) {
+        if (! $sessionToken) {
             return null;
         }
 
@@ -88,11 +102,14 @@ class PlayController extends Controller
 
         return RoomPlayer::query()
             ->where('room_id', $room->id)
-            ->where('session_token', $token)
+            ->where('session_token', $sessionToken)
             ->first();
     }
 
-    protected function findRoom(string $code): Room
+    /**
+     * Busca la sala por código (404 si no existe).
+     */
+    private function findRoom(string $code): Room
     {
         return Room::query()
             ->where('code', strtoupper($code))
