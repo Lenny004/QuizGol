@@ -22,6 +22,18 @@
 
 <div class="form-grid">
     <label class="field">
+        <span>Dificultad</span>
+        <select class="input" name="difficulty">
+            <option value="">Sin definir</option>
+            @foreach (\App\Models\Question::DIFFICULTIES as $value => $label)
+                <option value="{{ $value }}" @selected(old('difficulty', $question->difficulty ?? '') === $value)>
+                    {{ $label }}
+                </option>
+            @endforeach
+        </select>
+    </label>
+
+    <label class="field">
         <span>Tiempo límite (segundos)</span>
         <input class="input" type="number" name="time_limit" min="5" max="120" value="{{ old('time_limit', $question->time_limit ?? 30) }}" required>
     </label>

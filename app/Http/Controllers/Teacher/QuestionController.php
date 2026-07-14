@@ -23,6 +23,8 @@ class QuestionController extends Controller
             ->orderBy('id')
             ->get();
 
+        $section->load(['subject', 'grade']);
+
         return view('teacher.questions.index', compact('section', 'questions'));
     }
 
@@ -42,6 +44,8 @@ class QuestionController extends Controller
         DB::transaction(function () use ($section, $data) {
             $question = $section->questions()->create([
                 'prompt' => $data['prompt'],
+                'type' => Question::TYPE_MULTIPLE_CHOICE,
+                'difficulty' => $data['difficulty'],
                 'time_limit' => $data['time_limit'],
                 'points' => $data['points'],
                 'sort_order' => $section->questions()->count(),
@@ -76,6 +80,7 @@ class QuestionController extends Controller
         DB::transaction(function () use ($question, $data) {
             $question->update([
                 'prompt' => $data['prompt'],
+                'difficulty' => $data['difficulty'],
                 'time_limit' => $data['time_limit'],
                 'points' => $data['points'],
             ]);
@@ -108,12 +113,13 @@ class QuestionController extends Controller
     }
 
     /**
-     * @return array{prompt: string, time_limit: int, points: int, answers: array<int, string>, correct_index: int}
+     * @return array{prompt: string, difficulty: string|null, time_limit: int, points: int, answers: array<int, string>, correct_index: int}
      */
     private function validateQuestion(Request $request): array
     {
         $data = $request->validate([
             'prompt' => ['required', 'string', 'max:2000'],
+            'difficulty' => ['nullable', 'in:easy,medium,hard'],
             'time_limit' => ['required', 'integer', 'min:5', 'max:120'],
             'points' => ['required', 'integer', 'min:100', 'max:5000'],
             'answers' => ['required', 'array', 'min:2', 'max:4'],
@@ -149,6 +155,7 @@ class QuestionController extends Controller
 
         return [
             'prompt' => $data['prompt'],
+            'difficulty' => $data['difficulty'] ?? null,
             'time_limit' => $data['time_limit'],
             'points' => $data['points'],
             'answers' => $reindexed,

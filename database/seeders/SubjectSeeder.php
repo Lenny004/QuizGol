@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Grade;
 use App\Models\Subject;
 use Illuminate\Database\Seeder;
 
@@ -16,15 +17,20 @@ class SubjectSeeder extends Seeder
             ['name' => 'Estudios Sociales', 'slug' => 'estudios-sociales'],
         ];
 
-        foreach ($subjects as $subject) {
-            Subject::updateOrCreate(
-                ['slug' => $subject['slug']],
+        $gradeIds = Grade::query()->pluck('id');
+
+        foreach ($subjects as $subjectData) {
+            $subject = Subject::updateOrCreate(
+                ['slug' => $subjectData['slug']],
                 [
-                    'name' => $subject['name'],
+                    'name' => $subjectData['name'],
                     'is_active' => true,
                 ]
             );
+
+            if ($gradeIds->isNotEmpty()) {
+                $subject->grades()->sync($gradeIds);
+            }
         }
     }
 }
-

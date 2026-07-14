@@ -50,8 +50,8 @@
                 <div>
                     <strong>{{ $section->title }}</strong>
                     <span class="muted"> · {{ $section->subject->name }}</span>
-                    @if ($section->grade)
-                        <span class="muted"> · Grado {{ $section->grade }}</span>
+                    @if ($section->gradeLabel())
+                        <span class="muted"> · {{ $section->gradeLabel() }}</span>
                     @endif
                 </div>
                 <a class="btn btn-primary btn-sm" href="{{ route('sections.questions.index', $section) }}">Preguntas</a>

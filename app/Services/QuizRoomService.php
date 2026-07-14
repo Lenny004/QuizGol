@@ -255,6 +255,8 @@ class QuizRoomService
     public function buildHostState(Room $room): array
     {
         $room->loadMissing([
+            'section.subject',
+            'section.grade',
             'players.team',
             'currentQuestion.answers' => fn ($q) => $q->orderBy('sort_order')->orderBy('id'),
         ]);
@@ -282,6 +284,7 @@ class QuizRoomService
                 'id' => $room->currentQuestion->id,
                 'prompt' => $room->currentQuestion->prompt,
                 'time_limit' => $room->currentQuestion->time_limit,
+                'difficulty' => $room->currentQuestion->difficulty,
                 'started_at' => optional($room->question_started_at)?->toIso8601String(),
                 'answers' => $room->currentQuestion->answers->map(fn (Answer $a) => [
                     'id' => $a->id,
@@ -307,6 +310,11 @@ class QuizRoomService
             'status' => $room->status,
             'mode' => $room->mode,
             'code' => $room->code,
+            'section' => [
+                'title' => $room->section->title,
+                'subject' => $room->section->subject?->name,
+                'grade' => $room->section->gradeLabel(),
+            ],
             'players_count' => $room->players->count(),
             'players' => $room->players
                 ->sortByDesc('score')

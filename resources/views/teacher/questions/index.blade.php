@@ -8,8 +8,8 @@
             <h1 class="page-title">{{ $section->title }}</h1>
             <p class="page-subtitle">
                 {{ $section->subject->name }}
-                @if ($section->grade)
-                    · Grado {{ $section->grade }}
+                @if ($section->gradeLabel())
+                    · {{ $section->gradeLabel() }}
                 @endif
             </p>
         </div>
@@ -32,6 +32,9 @@
                     <p class="muted">
                         {{ $question->time_limit }}s · {{ $question->points }} pts ·
                         {{ $question->answers->count() }} respuestas
+                        @if ($question->difficultyLabel())
+                            · {{ $question->difficultyLabel() }}
+                        @endif
                     </p>
                     <ul class="answer-preview">
                         @foreach ($question->answers as $answer)

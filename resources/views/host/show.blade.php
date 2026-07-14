@@ -19,8 +19,14 @@
                 <p class="muted">Código de sala</p>
                 <div class="room-code" id="host-code">{{ $room->code }}</div>
                 <p class="page-subtitle">
-                    {{ $room->section->title }} ·
-                    {{ $room->mode === 'match' ? 'Partido 2 equipos' : 'Quiz individual' }}
+                    {{ $room->section->title }}
+                    @if ($room->section->subject)
+                        · {{ $room->section->subject->name }}
+                    @endif
+                    @if ($room->section->gradeLabel())
+                        · {{ $room->section->gradeLabel() }}
+                    @endif
+                    · {{ $room->mode === 'match' ? 'Partido 2 equipos' : 'Quiz individual' }}
                 </p>
             </div>
             <div class="host-controls" id="host-controls">

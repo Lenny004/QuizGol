@@ -13,13 +13,13 @@ class DashboardController extends Controller
 
         $sectionsCount = $user->sections()->count();
         $recentSections = $user->sections()
-            ->with('subject')
+            ->with(['subject', 'grade'])
             ->latest()
             ->take(5)
             ->get();
 
         $activeRooms = $user->hostedRooms()
-            ->with('section')
+            ->with(['section.subject', 'section.grade'])
             ->whereIn('status', ['lobby', 'active'])
             ->latest()
             ->get();

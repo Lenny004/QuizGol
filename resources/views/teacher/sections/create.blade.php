@@ -6,7 +6,7 @@
     <div class="page-header">
         <div>
             <h1 class="page-title">Nueva sección</h1>
-            <p class="page-subtitle">Elige materia y título para tu quiz.</p>
+            <p class="page-subtitle">Elige materia, grado y título para tu quiz.</p>
         </div>
         <a class="btn btn-ghost" href="{{ route('sections.index') }}">Volver</a>
     </div>
@@ -18,6 +18,7 @@
             <label class="field">
                 <span>Título</span>
                 <input class="input" type="text" name="title" value="{{ old('title') }}" required maxlength="255">
+                @error('title') <span class="field-error">{{ $message }}</span> @enderror
             </label>
 
             <label class="field">
@@ -30,11 +31,20 @@
                         </option>
                     @endforeach
                 </select>
+                @error('subject_id') <span class="field-error">{{ $message }}</span> @enderror
             </label>
 
             <label class="field">
-                <span>Grado (opcional)</span>
-                <input class="input" type="text" name="grade" value="{{ old('grade') }}" maxlength="50" placeholder="Ej. 5to">
+                <span>Grado</span>
+                <select class="input" name="grade_id">
+                    <option value="">Sin grado</option>
+                    @foreach ($grades as $grade)
+                        <option value="{{ $grade->id }}" @selected(old('grade_id') == $grade->id)>
+                            {{ $grade->name }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('grade_id') <span class="field-error">{{ $message }}</span> @enderror
             </label>
 
             <div class="form-actions">

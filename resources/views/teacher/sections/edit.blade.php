@@ -19,6 +19,7 @@
             <label class="field">
                 <span>Título</span>
                 <input class="input" type="text" name="title" value="{{ old('title', $section->title) }}" required maxlength="255">
+                @error('title') <span class="field-error">{{ $message }}</span> @enderror
             </label>
 
             <label class="field">
@@ -30,11 +31,20 @@
                         </option>
                     @endforeach
                 </select>
+                @error('subject_id') <span class="field-error">{{ $message }}</span> @enderror
             </label>
 
             <label class="field">
-                <span>Grado (opcional)</span>
-                <input class="input" type="text" name="grade" value="{{ old('grade', $section->grade) }}" maxlength="50">
+                <span>Grado</span>
+                <select class="input" name="grade_id">
+                    <option value="">Sin grado</option>
+                    @foreach ($grades as $grade)
+                        <option value="{{ $grade->id }}" @selected(old('grade_id', $section->grade_id) == $grade->id)>
+                            {{ $grade->name }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('grade_id') <span class="field-error">{{ $message }}</span> @enderror
             </label>
 
             <div class="form-actions">

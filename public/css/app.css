@@ -255,6 +255,15 @@ ul {
   gap: 1rem;
 }
 
+.field-error {
+  color: #ffb4a8;
+  font-size: 0.85rem;
+}
+
+.filters-bar {
+  padding: 1rem 1.25rem;
+}
+
 .field {
   display: grid;
   gap: 0.4rem;

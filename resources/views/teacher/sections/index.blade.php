@@ -11,6 +11,38 @@
         <a class="btn btn-gold" href="{{ route('sections.create') }}">Nueva sección</a>
     </div>
 
+    <form method="GET" action="{{ route('sections.index') }}" class="card card-form filters-bar" style="margin-bottom: 1rem;">
+        <div class="form-grid">
+            <label class="field">
+                <span>Materia</span>
+                <select class="input" name="subject_id" onchange="this.form.submit()">
+                    <option value="">Todas</option>
+                    @foreach ($subjects as $subject)
+                        <option value="{{ $subject->id }}" @selected($subjectId == $subject->id)>
+                            {{ $subject->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </label>
+            <label class="field">
+                <span>Grado</span>
+                <select class="input" name="grade_id" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    @foreach ($grades as $grade)
+                        <option value="{{ $grade->id }}" @selected($gradeId == $grade->id)>
+                            {{ $grade->name }}
+                        </option>
+                    @endforeach
+                </select>
+            </label>
+        </div>
+        @if ($subjectId || $gradeId)
+            <div class="form-actions">
+                <a class="btn btn-ghost btn-sm" href="{{ route('sections.index') }}">Limpiar filtros</a>
+            </div>
+        @endif
+    </form>
+
     <div class="card">
         @if ($sections->isEmpty())
             <p class="empty">No hay secciones todavía.</p>
@@ -30,7 +62,7 @@
                         <tr>
                             <td>{{ $section->title }}</td>
                             <td>{{ $section->subject->name }}</td>
-                            <td>{{ $section->grade ?: '—' }}</td>
+                            <td>{{ $section->gradeLabel() ?: '—' }}</td>
                             <td>{{ $section->questions_count }}</td>
                             <td class="table-actions">
                                 <form method="POST" action="{{ route('rooms.store') }}" class="inline-form">

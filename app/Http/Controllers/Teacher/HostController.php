@@ -18,7 +18,7 @@ class HostController extends Controller
     {
         $this->authorizeHost($room);
 
-        $room->load('section');
+        $room->load(['section.subject', 'section.grade']);
 
         return view('host.show', compact('room'));
     }
