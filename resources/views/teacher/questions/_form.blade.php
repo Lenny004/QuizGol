@@ -1,3 +1,7 @@
+{{--
+  Partial del formulario de pregunta (create/edit).
+  Campos: prompt, difficulty, time_limit, points, 4 respuestas + correct_index.
+--}}
 @php
     $existingAnswers = old('answers');
     if ($existingAnswers === null && isset($question)) {

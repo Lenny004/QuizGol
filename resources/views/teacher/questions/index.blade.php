@@ -1,3 +1,4 @@
+{{-- Lista de preguntas de una sección + acciones crear/editar/borrar. --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Preguntas — QuizGol')

@@ -1,3 +1,4 @@
+{{-- Layout principal de QuizGol (maestro, host y play). Carga public/css/app.css. --}}
 <!DOCTYPE html>
 <html lang="es">
 <head>

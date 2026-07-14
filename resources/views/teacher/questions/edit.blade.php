@@ -1,3 +1,4 @@
+{{-- Editar pregunta y sus respuestas. --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Editar pregunta — QuizGol')

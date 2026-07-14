@@ -1,3 +1,4 @@
+{{-- Listado de secciones del maestro con filtros por materia/grado. --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Secciones — QuizGol')

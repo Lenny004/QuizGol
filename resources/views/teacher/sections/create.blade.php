@@ -1,3 +1,4 @@
+{{-- Formulario para crear una sección (materia + grado + título). --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Nueva sección — QuizGol')

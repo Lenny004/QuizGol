@@ -1,3 +1,4 @@
+{{-- Landing pública: CTA para unirse o iniciar sesión como maestro. --}}
 <!DOCTYPE html>
 <html lang="es">
 <head>

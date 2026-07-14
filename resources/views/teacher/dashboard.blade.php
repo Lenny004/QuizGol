@@ -1,3 +1,4 @@
+{{-- Dashboard del maestro: contadores, salas activas y secciones recientes. --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Dashboard — QuizGol')

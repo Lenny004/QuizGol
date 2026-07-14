@@ -1,3 +1,4 @@
+{{-- Pantalla del jugador. Monta #play-app + public/js/play.js (polling + respuestas). --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Jugando '.$room->code.' — QuizGol')

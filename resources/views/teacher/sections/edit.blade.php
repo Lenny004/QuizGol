@@ -1,3 +1,4 @@
+{{-- Formulario para editar una sección existente. --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Editar sección — QuizGol')

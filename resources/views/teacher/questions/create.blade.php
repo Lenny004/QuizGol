@@ -1,3 +1,4 @@
+{{-- Crear pregunta de opción múltiple dentro de una sección. --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Nueva pregunta — QuizGol')

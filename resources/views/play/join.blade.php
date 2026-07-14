@@ -1,3 +1,4 @@
+{{-- Formulario público para unirse a una sala con código + apodo (+ equipo si es partido). --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Unirse a sala — QuizGol')

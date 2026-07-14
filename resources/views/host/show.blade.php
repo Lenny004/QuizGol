@@ -1,3 +1,4 @@
+{{-- Pantalla del anfitrión (proyector). Monta #host-app + public/js/host.js --}}
 @extends('layouts.quizgol')
 
 @section('title', 'Sala '.$room->code.' — QuizGol')
