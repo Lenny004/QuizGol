@@ -1,4 +1,4 @@
-{{-- Layout principal de QuizGol (maestro, host y play). Carga public/css/app.css. --}}
+{{-- Layout principal de QuizGol (maestro, host y play). Carga public/css/app.css (BEM). --}}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -11,17 +11,17 @@
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 </head>
 <body>
-    <div class="app-shell">
+    <div class="app__shell">
         <header class="nav">
-            <a class="nav-brand" href="{{ auth()->check() ? route('dashboard') : url('/') }}">QuizGol</a>
-            <nav class="nav-links">
+            <a class="nav__brand" href="{{ auth()->check() ? route('dashboard') : url('/') }}">QuizGol</a>
+            <nav class="nav__links">
                 @auth
                     <a href="{{ route('dashboard') }}">Dashboard</a>
                     <a href="{{ route('sections.index') }}">Secciones</a>
                     <a href="{{ route('play.join') }}">Unirse</a>
-                    <form method="POST" action="{{ route('logout') }}" class="nav-logout">
+                    <form method="POST" action="{{ route('logout') }}" class="nav__logout">
                         @csrf
-                        <button type="submit" class="btn btn-ghost">Salir</button>
+                        <button type="submit" class="btn btn--ghost">Salir</button>
                     </form>
                 @else
                     <a href="{{ route('play.join') }}">Unirse</a>
@@ -30,18 +30,18 @@
             </nav>
         </header>
 
-        <main class="container">
+        <main class="app__main">
             @if (session('success'))
-                <div class="alert alert-success">{{ session('success') }}</div>
+                <div class="alert alert--success">{{ session('success') }}</div>
             @endif
 
             @if (session('info'))
-                <div class="alert alert-info">{{ session('info') }}</div>
+                <div class="alert alert--info">{{ session('info') }}</div>
             @endif
 
             @if ($errors->any())
-                <div class="alert alert-danger">
-                    <ul class="alert-list">
+                <div class="alert alert--danger">
+                    <ul class="alert__list">
                         @foreach ($errors->all() as $error)
                             <li>{{ $error }}</li>
                         @endforeach

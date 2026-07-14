@@ -6,18 +6,18 @@
 @section('content')
     <div class="page-header">
         <div>
-            <h1 class="page-title">Nueva pregunta</h1>
-            <p class="page-subtitle">Sección: {{ $section->title }}</p>
+            <h1 class="page-header__title">Nueva pregunta</h1>
+            <p class="page-header__subtitle">Sección: {{ $section->title }}</p>
         </div>
-        <a class="btn btn-ghost" href="{{ route('sections.questions.index', $section) }}">Volver</a>
+        <a class="btn btn--ghost" href="{{ route('sections.questions.index', $section) }}">Volver</a>
     </div>
 
-    <div class="card card-form">
+    <div class="card card--form">
         <form method="POST" action="{{ route('sections.questions.store', $section) }}" class="form">
             @csrf
             @include('teacher.questions._form')
-            <div class="form-actions">
-                <button type="submit" class="btn btn-gold">Crear pregunta</button>
+            <div class="form__actions">
+                <button type="submit" class="btn btn--gold">Crear pregunta</button>
             </div>
         </form>
     </div>

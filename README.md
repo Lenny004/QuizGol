@@ -81,9 +81,76 @@ docker compose exec app php scripts/verify_match_room.php
 | PostgreSQL 16 | quizgol_postgres | 5432           | Usuario/DB: `quizgol`          |
 | Mailpit    | quizgol_mailpit    | 8025, 1025       | UI en :8025                    |
 
+## CSS (BEM)
+
+Los estilos de QuizGol viven en `public/css/app.css` y siguen **BEM** (`block__element--modifier`).
+
+### Convención
+
+| Tipo | Formato | Ejemplo |
+|------|--------|---------|
+| Block | `nombre-bloque` | `btn`, `host`, `match` |
+| Element | `bloque__elemento` | `host__code`, `form__input` |
+| Modifier | `bloque--mod` o `bloque__elemento--mod` | `btn--gold`, `team__badge--home` |
+
+Reglas rápidas:
+
+- Un **block** es un componente independiente (botón, formulario, marcador).
+- Un **element** solo existe dentro de su block (`form__input`, no `input` suelto).
+- Un **modifier** cambia variante o estado (`btn--danger`, `feedback--goal`).
+- No anidar BEM tipo `block__el1__el2`; si hace falta, crear otro block.
+- Los **IDs** (`#host-app`, `#play-nick`) se reservan para JS; las clases son para estilo.
+
+### Mapa de bloques
+
+| Block | Uso |
+|-------|-----|
+| `app` | Shell de la app (`app__shell`, `app__main`) |
+| `nav` | Barra superior |
+| `page-header` | Título + subtítulo + acciones de página |
+| `btn` | Botones (`btn--gold`, `btn--primary`, `btn--ghost`, `btn--danger`, `btn--sm`, `btn--secondary`) |
+| `card` | Contenedores (`card--form`, `card--filters`) |
+| `panel` | Secciones del dashboard |
+| `stats` | Contadores del dashboard |
+| `form` | Formularios y campos |
+| `table` | Tablas del área maestro |
+| `list` | Filas de listas y preview de respuestas |
+| `alert` | Flash messages |
+| `badge` | Etiqueta “Correcta” |
+| `text` | Utilidades (`text--muted`, `text--empty`) |
+| `host` | Pantalla proyector del maestro |
+| `play` | Pantalla del jugador |
+| `question` | Meta, countdown y enunciado |
+| `scoreboard` | Ranking / lista de jugadores |
+| `team` | Badge y chip de equipo (`--home` / `--away`) |
+| `match` | Marcador Local vs Visitante (`match--compact`) |
+| `answer-grid` | Botones de respuesta del jugador |
+| `feedback` | Resultado gol/fallo (`feedback--goal`, `feedback--miss`) |
+| `landing` | Página de bienvenida |
+
+### Archivos que usan estas clases
+
+- Vistas: `resources/views/layouts/quizgol.blade.php`, `welcome`, `teacher/*`, `host/*`, `play/*`
+- JS dinámico: `public/js/host.js`, `public/js/play.js` (también generan clases BEM)
+
+Las vistas de Breeze (`auth/*`, `profile/*`, `layouts/app`) usan Tailwind y **no** siguen este CSS.
+
+### Ejemplo
+
+```html
+<button class="btn btn--gold btn--sm">Iniciar</button>
+
+<div class="match match--compact">
+  <div class="match__side">
+    <span class="match__name">Local</span>
+    <span class="match__goals">2</span>
+  </div>
+</div>
+```
+
 ## Animaciones (Lottie)
 
-Las animaciones de gol/fallo usan CSS (`goal-burst` / `miss-shake`) como placeholder. La carpeta `public/lottie/` está reservada por si más adelante se añaden archivos Lottie reales.
+Las animaciones de gol/fallo usan CSS (`feedback--goal` / `feedback--miss`) como placeholder. La carpeta `public/lottie/` está reservada por si más adelante se añaden archivos Lottie reales.
 
 ## Variables de entorno
 

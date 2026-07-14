@@ -6,7 +6,7 @@
  * - Fases: lobby → question → reveal → finished
  * - En mode=match muestra marcador y equipo
  *
- * Animaciones actuales: CSS goal-burst / miss-shake
+ * Animaciones actuales: CSS feedback--goal / feedback--miss
  * (placeholder para Lottie en public/lottie/)
  */
 (function () {
@@ -46,7 +46,12 @@
   let countdownTimer = null;
   let lastQuestionId = null;
   let isSubmittingAnswer = false;
-  const answerColors = ['answer-red', 'answer-blue', 'answer-yellow', 'answer-green'];
+  const answerColors = [
+    'answer-grid__btn--red',
+    'answer-grid__btn--blue',
+    'answer-grid__btn--yellow',
+    'answer-grid__btn--green',
+  ];
 
   /** Muestra solo el bloque de la fase actual. */
   function showPhase(phase) {
@@ -65,7 +70,7 @@
     }
     elements.teamBadge.hidden = false;
     elements.teamBadge.textContent = myTeam.name;
-    elements.teamBadge.className = 'team-badge team-' + (myTeam.side || '');
+    elements.teamBadge.className = 'team__badge team__badge--' + (myTeam.side || '');
   }
 
   /** Actualiza el marcador Local vs Visitante. */
@@ -98,7 +103,7 @@
     (answers || []).forEach((answer, index) => {
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'answer-btn ' + answerColors[index % 4];
+      button.className = 'answer-grid__btn ' + answerColors[index % 4];
       button.textContent = answer.text;
       button.dataset.answerId = answer.id;
       button.addEventListener('click', () => submitAnswer(answer.id));
@@ -143,15 +148,15 @@
   /** Feedback visual tras responder (gol / fallo). */
   function renderReveal(myAnswer) {
     const isCorrect = myAnswer && myAnswer.is_correct;
-    const feedbackClass = isCorrect ? 'goal-burst' : 'miss-shake';
+    const feedbackClass = isCorrect ? 'feedback--goal' : 'feedback--miss';
     const emoji = isCorrect ? '⚽ GOL!' : '💨 Fallo';
     const pointsAwarded = myAnswer ? myAnswer.points_awarded : 0;
     const goalNote = isCorrect && gameMode === 'match'
-      ? '<p class="muted">+1 gol para tu equipo</p>'
+      ? '<p class="text--muted">+1 gol para tu equipo</p>'
       : '';
 
     elements.revealContent.innerHTML =
-      `<div class="feedback ${feedbackClass}"><span class="feedback-emoji">${emoji}</span>` +
+      `<div class="feedback ${feedbackClass}"><span class="feedback__emoji">${emoji}</span>` +
       `<p>${isCorrect ? '+' + pointsAwarded + ' puntos' : 'Sigue intentando'}</p>${goalNote}</div>`;
   }
 

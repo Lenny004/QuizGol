@@ -105,11 +105,11 @@
       .map((player) => {
         const teamName = player.team_name || teamLabel(player.team_side);
         const badge = teamName
-          ? ` <span class="team-chip team-${player.team_side || ''}">${escapeHtml(teamName)}</span>`
+          ? ` <span class="team__chip team__chip--${player.team_side || ''}">${escapeHtml(teamName)}</span>`
           : '';
         return `<li>${escapeHtml(player.nickname)}${badge}</li>`;
       })
-      .join('') || '<li class="muted">Nadie aún</li>';
+      .join('') || '<li class="text--muted">Nadie aún</li>';
   }
 
   function startCountdown(startedAt, timeLimit) {
@@ -137,11 +137,16 @@
       : '';
     elements.answered.textContent = `${state.answered_count} / ${state.players_count} respondieron`;
 
-    const answerColors = ['answer-red', 'answer-blue', 'answer-yellow', 'answer-green'];
+    const answerColors = [
+      'host__answer--red',
+      'host__answer--blue',
+      'host__answer--yellow',
+      'host__answer--green',
+    ];
     elements.answers.innerHTML = (question.answers || [])
       .map((answer, index) => {
-        const correctClass = answer.is_correct ? ' is-correct-host' : '';
-        return `<div class="host-answer ${answerColors[index % 4]}${correctClass}">${escapeHtml(answer.text)}</div>`;
+        const correctClass = answer.is_correct ? ' host__answer--correct' : '';
+        return `<div class="host__answer ${answerColors[index % 4]}${correctClass}">${escapeHtml(answer.text)}</div>`;
       })
       .join('');
 
