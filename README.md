@@ -160,7 +160,7 @@ Dashboard → **Reportes recientes**, o `/rooms/{id}/results` (solo anfitrión):
 
 ## Visual / CSS (BEM)
 
-Estilos en `public/css/app.css` (BEM). Tema fútbol: verde + crema + dorado, QR en lobby, respuestas tipo Kahoot. Auth/perfil Breeze usan Tailwind.
+Estilos en `public/css/app.css` (BEM). Tema fútbol: verde + crema + dorado. Login, registro, perfil, host y play usan el mismo CSS (sin Vite/Tailwind).
 
 | Block | Uso |
 |-------|-----|

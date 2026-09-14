@@ -1,52 +1,44 @@
-<x-guest-layout>
-    <form method="POST" action="{{ route('register') }}">
-        @csrf
+{{-- Registro de maestros. --}}
+@extends('layouts.quizgol')
 
-        <!-- Name -->
+@section('title', 'Crear cuenta — QuizGol')
+
+@section('content')
+    <div class="page-header">
         <div>
-            <x-input-label for="name" :value="__('Name')" />
-            <x-text-input id="name" class="block mt-1 w-full" type="text" name="name" :value="old('name')" required autofocus autocomplete="name" />
-            <x-input-error :messages="$errors->get('name')" class="mt-2" />
+            <h1 class="page-header__title">Crear cuenta</h1>
+            <p class="page-header__subtitle">Regístrate para armar secciones y lanzar quizzes en vivo.</p>
         </div>
+    </div>
 
-        <!-- Email Address -->
-        <div class="mt-4">
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
+    <div class="card card--form">
+        <form method="POST" action="{{ route('register') }}" class="form">
+            @csrf
 
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
+            <label class="form__field">
+                <span>Nombre</span>
+                <input class="form__input" id="name" type="text" name="name" value="{{ old('name') }}" required autofocus autocomplete="name">
+            </label>
 
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="new-password" />
+            <label class="form__field">
+                <span>Correo</span>
+                <input class="form__input" id="email" type="email" name="email" value="{{ old('email') }}" required autocomplete="username">
+            </label>
 
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
+            <label class="form__field">
+                <span>Contraseña</span>
+                <input class="form__input" id="password" type="password" name="password" required autocomplete="new-password">
+            </label>
 
-        <!-- Confirm Password -->
-        <div class="mt-4">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
+            <label class="form__field">
+                <span>Confirmar contraseña</span>
+                <input class="form__input" id="password_confirmation" type="password" name="password_confirmation" required autocomplete="new-password">
+            </label>
 
-            <x-text-input id="password_confirmation" class="block mt-1 w-full"
-                            type="password"
-                            name="password_confirmation" required autocomplete="new-password" />
-
-            <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('login') }}">
-                {{ __('Already registered?') }}
-            </a>
-
-            <x-primary-button class="ms-4">
-                {{ __('Register') }}
-            </x-primary-button>
-        </div>
-    </form>
-</x-guest-layout>
+            <div class="form__actions">
+                <button type="submit" class="btn btn--gold">Registrarme</button>
+                <a href="{{ route('login') }}">Ya tengo cuenta</a>
+            </div>
+        </form>
+    </div>
+@endsection

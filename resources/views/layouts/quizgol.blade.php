@@ -18,6 +18,7 @@
                 @auth
                     <a href="{{ route('dashboard') }}">Dashboard</a>
                     <a href="{{ route('sections.index') }}">Secciones</a>
+                    <a href="{{ route('profile.edit') }}">Perfil</a>
                     <a href="{{ route('play.join') }}">Unirse</a>
                     <form method="POST" action="{{ route('logout') }}" class="nav__logout">
                         @csrf
@@ -39,10 +40,24 @@
                 <div class="alert alert--info">{{ session('info') }}</div>
             @endif
 
-            @if ($errors->any())
+            @if (session('status'))
+                <div class="alert alert--success">
+                    {{ match (session('status')) {
+                        'profile-updated' => 'Perfil actualizado.',
+                        'password-updated' => 'Contraseña actualizada.',
+                        'verification-link-sent' => 'Te enviamos un nuevo enlace de verificación.',
+                        default => session('status'),
+                    } }}
+                </div>
+            @endif
+
+            @php
+                $errorMessages = collect($errors->getBags())->flatMap->all()->unique();
+            @endphp
+            @if ($errorMessages->isNotEmpty())
                 <div class="alert alert--danger">
                     <ul class="alert__list">
-                        @foreach ($errors->all() as $error)
+                        @foreach ($errorMessages as $error)
                             <li>{{ $error }}</li>
                         @endforeach
                     </ul>
