@@ -18,7 +18,7 @@ class MatchRoomFlowTest extends TestCase
 
     public function test_match_room_awards_goal_on_correct_answer(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection();
         $matchService = app(MatchGameService::class);
         $quizService = app(QuizRoomService::class);
 
@@ -38,7 +38,7 @@ class MatchRoomFlowTest extends TestCase
 
     public function test_join_requires_team_in_match_mode(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection();
         $matchService = app(MatchGameService::class);
         $room = $matchService->createRoom($teacher, $section);
 

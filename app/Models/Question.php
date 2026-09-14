@@ -11,9 +11,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * - prompt: texto de la pregunta
  * - time_limit: segundos para responder (default 30)
- * - points: puntos base al acertar (default 1000)
+ * - points: puntos base según dificultad (fácil 500, media 1000, difícil 2000)
  * - sort_order: orden de aparición en el juego
- * - difficulty: easy|medium|hard (opcional)
+ * - difficulty: easy|medium|hard
  */
 class Question extends Model
 {

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Grade;
 use App\Models\Section;
 use App\Models\Subject;
+use App\Services\EvaluationBalanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -19,25 +20,30 @@ class SectionController extends Controller
     /**
      * Lista las secciones del maestro, con filtros opcionales por materia/grado.
      */
-    public function index(Request $request): View
+    public function index(Request $request, EvaluationBalanceService $evaluationBalance): View
     {
         $subjectId = $request->integer('subject_id') ?: null;
         $gradeId = $request->integer('grade_id') ?: null;
 
         $sections = auth()->user()
             ->sections()
-            ->with(['subject', 'grade'])
+            ->with(['subject', 'grade', 'questions:id,section_id,difficulty,points'])
             ->withCount('questions')
             ->forSubject($subjectId)
             ->forGrade($gradeId)
             ->latest()
             ->get();
 
+        $balances = $sections->mapWithKeys(
+            fn (Section $section) => [$section->id => $evaluationBalance->analyze($section)]
+        );
+
         $subjects = Subject::query()->active()->orderBy('name')->get();
         $grades = Grade::query()->active()->ordered()->get();
 
         return view('teacher.sections.index', compact(
             'sections',
+            'balances',
             'subjects',
             'grades',
             'subjectId',

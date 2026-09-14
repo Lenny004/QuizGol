@@ -8,10 +8,15 @@ use App\Models\Question;
 use App\Models\Section;
 use App\Models\Subject;
 use App\Models\User;
+use App\Support\QuestionScoring;
 
 trait CreatesQuizContent
 {
-    protected function createTeacherWithSection(int $questionCount = 2, int $timeLimit = 30): array
+    /**
+     * @param  array<int, string>|null  $difficulties
+     * @return array{teacher: User, subject: Subject, grade: Grade, section: Section}
+     */
+    protected function createTeacherWithSection(int $questionCount = 3, int $timeLimit = 30, ?array $difficulties = null): array
     {
         $teacher = User::factory()->teacher()->create();
 
@@ -37,15 +42,29 @@ trait CreatesQuizContent
             'title' => 'Sección test',
         ]);
 
+        $this->addQuestionsToSection($section, $questionCount, $timeLimit, $difficulties);
+
+        return compact('teacher', 'subject', 'grade', 'section');
+    }
+
+    /**
+     * @param  array<int, string>|null  $difficulties
+     */
+    protected function addQuestionsToSection(Section $section, int $questionCount, int $timeLimit = 30, ?array $difficulties = null): void
+    {
+        $levels = $difficulties ?? ['easy', 'medium', 'hard'];
+        $startingOrder = (int) $section->questions()->max('sort_order');
+
         for ($i = 0; $i < $questionCount; $i++) {
+            $difficulty = $levels[$i % count($levels)];
             $question = Question::query()->create([
                 'section_id' => $section->id,
-                'prompt' => "Pregunta {$i}",
+                'prompt' => 'Pregunta '.$section->id.'-'.$i,
                 'type' => Question::TYPE_MULTIPLE_CHOICE,
-                'difficulty' => 'easy',
+                'difficulty' => $difficulty,
                 'time_limit' => $timeLimit,
-                'points' => 1000,
-                'sort_order' => $i,
+                'points' => QuestionScoring::basePoints($difficulty),
+                'sort_order' => $startingOrder + 1 + $i,
             ]);
 
             foreach (['A', 'B', 'C', 'D'] as $index => $letter) {
@@ -57,7 +76,5 @@ trait CreatesQuizContent
                 ]);
             }
         }
-
-        return compact('teacher', 'subject', 'grade', 'section');
     }
 }

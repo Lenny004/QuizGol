@@ -1,6 +1,6 @@
 {{--
   Partial del formulario de pregunta (create/edit).
-  Campos: prompt, difficulty, time_limit, points, 4 respuestas + correct_index.
+  Campos: prompt, difficulty, time_limit, points (derivados de la dificultad), 4 respuestas + correct_index.
 --}}
 @php
     $existingAnswers = old('answers');
@@ -17,20 +17,23 @@
         $correctIndex = $question->answers->search(fn ($a) => $a->is_correct);
     }
     $correctIndex = (int) ($correctIndex ?? 0);
+
+    $selectedDifficulty = old('difficulty', $question->difficulty ?? 'medium');
+    $pointsMap = \App\Support\QuestionScoring::pointsMap();
+    $selectedPoints = \App\Support\QuestionScoring::basePoints($selectedDifficulty);
 @endphp
 
 <label class="form__field">
-    <span>Enunciado</span>
-    <textarea class="form__input" name="prompt" rows="3" required maxlength="2000">{{ old('prompt', $question->prompt ?? '') }}</textarea>
+    <span class="form__label">Enunciado</span>
+    <textarea class="form__input" name="prompt" rows="3" required maxlength="2000" placeholder="Escribe la pregunta que verán los jugadores">{{ old('prompt', $question->prompt ?? '') }}</textarea>
 </label>
 
 <div class="form__grid">
     <label class="form__field">
-        <span>Dificultad</span>
-        <select class="form__input" name="difficulty">
-            <option value="">Sin definir</option>
+        <span class="form__label">Dificultad</span>
+        <select class="form__input" name="difficulty" id="question-difficulty" required>
             @foreach (\App\Models\Question::DIFFICULTIES as $value => $label)
-                <option value="{{ $value }}" @selected(old('difficulty', $question->difficulty ?? '') === $value)>
+                <option value="{{ $value }}" @selected($selectedDifficulty === $value)>
                     {{ $label }}
                 </option>
             @endforeach
@@ -38,15 +41,29 @@
     </label>
 
     <label class="form__field">
-        <span>Tiempo límite (segundos)</span>
+        <span class="form__label">Tiempo (segundos)</span>
         <input class="form__input" type="number" name="time_limit" min="5" max="120" value="{{ old('time_limit', $question->time_limit ?? 30) }}" required>
     </label>
 
     <label class="form__field">
-        <span>Puntos</span>
-        <input class="form__input" type="number" name="points" min="100" max="5000" step="100" value="{{ old('points', $question->points ?? 1000) }}" required>
+        <span class="form__label">Puntos</span>
+        <input
+            class="form__input form__input--readonly"
+            type="number"
+            name="points"
+            id="question-points"
+            min="500"
+            max="2000"
+            step="500"
+            value="{{ $selectedPoints }}"
+            readonly
+            tabindex="-1"
+            data-points-map="{{ json_encode($pointsMap) }}"
+            aria-describedby="question-points-hint"
+        >
     </label>
 </div>
+<p class="form__hint" id="question-points-hint">Fácil 500 · Media 1000 · Difícil 2000. Un acierto da la mitad; el resto es bonus por rapidez.</p>
 
 <fieldset class="form__field form__answers">
     <legend>Respuestas (2 a 4)</legend>

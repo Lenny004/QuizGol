@@ -17,13 +17,13 @@
             @csrf
 
             <label class="form__field">
-                <span>Título</span>
-                <input class="form__input" type="text" name="title" value="{{ old('title') }}" required maxlength="255">
+                <span class="form__label">Título</span>
+                <input class="form__input" type="text" name="title" value="{{ old('title') }}" required maxlength="255" placeholder="Ej. Sumas y restas — Bloque 1">
                 @error('title') <span class="form__error">{{ $message }}</span> @enderror
             </label>
 
             <label class="form__field">
-                <span>Materia</span>
+                <span class="form__label">Materia</span>
                 <select class="form__input" name="subject_id" required>
                     <option value="">Selecciona una materia</option>
                     @foreach ($subjects as $subject)
@@ -36,7 +36,7 @@
             </label>
 
             <label class="form__field">
-                <span>Grado</span>
+                <span class="form__label">Grado</span>
                 <select class="form__input" name="grade_id">
                     <option value="">Sin grado</option>
                     @foreach ($grades as $grade)

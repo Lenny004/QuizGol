@@ -55,28 +55,47 @@
                         <th>Materia</th>
                         <th>Grado</th>
                         <th>Preguntas</th>
+                        <th>Equilibrio</th>
                         <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($sections as $section)
+                        @php($balance = $balances[$section->id])
                         <tr>
                             <td>{{ $section->title }}</td>
                             <td>{{ $section->subject->name }}</td>
                             <td>{{ $section->gradeLabel() ?: '—' }}</td>
                             <td>{{ $section->questions_count }}</td>
+                            <td>
+                                @if ($balance['balanced'])
+                                    <span class="badge badge--ok">Equilibrada</span>
+                                @else
+                                    <span class="badge badge--low" title="{{ implode(' ', $balance['issues']) }}">Pendiente</span>
+                                @endif
+                            </td>
                             <td class="table__actions">
                                 <form method="POST" action="{{ route('rooms.store') }}" class="form form--inline">
                                     @csrf
                                     <input type="hidden" name="section_id" value="{{ $section->id }}">
                                     <input type="hidden" name="mode" value="quiz">
-                                    <button type="submit" class="btn btn--gold btn--sm" @disabled($section->questions_count < 1) title="Cada alumno suma puntos por su cuenta">Quiz individual</button>
+                                    <button
+                                        type="submit"
+                                        class="btn btn--gold btn--sm"
+                                        @disabled(! $balance['balanced'])
+                                        title="{{ $balance['balanced'] ? 'Cada alumno suma puntos por su cuenta' : implode(' ', $balance['issues']) }}"
+                                    >Quiz individual</button>
                                 </form>
                                 <form method="POST" action="{{ route('rooms.store') }}" class="form form--inline">
                                     @csrf
                                     <input type="hidden" name="section_id" value="{{ $section->id }}">
                                     <input type="hidden" name="mode" value="match">
-                                    <button type="submit" class="btn btn--primary btn--sm" @disabled($section->questions_count < 1) title="Dos equipos: Local vs Visitante">Partido 2 equipos</button>
+                                    <button
+                                        type="submit"
+                                        class="btn btn--primary btn--sm"
+                                        @disabled(! $balance['balanced'])
+                                        title="{{ $balance['balanced'] ? 'Dos equipos: Local vs Visitante' : implode(' ', $balance['issues']) }}"
+                                    >Partido 2 equipos</button>
                                 </form>
                                 <a class="btn btn--ghost btn--sm" href="{{ route('sections.questions.index', $section) }}">Preguntas</a>
                                 <a class="btn btn--ghost btn--sm" href="{{ route('sections.edit', $section) }}">Editar</a>

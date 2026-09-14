@@ -9,6 +9,7 @@ use App\Models\Room;
 use App\Models\RoomPlayer;
 use App\Models\Section;
 use App\Models\User;
+use App\Support\QuestionScoring;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -21,17 +22,15 @@ use RuntimeException;
  */
 class QuizRoomService
 {
-    public function __construct(private MatchGameService $matchGames)
-    {
+    public function __construct(
+        private MatchGameService $matchGames,
+        private EvaluationBalanceService $evaluationBalance,
+    ) {
     }
 
     public function createRoom(User $host, Section $section): Room
     {
-        if ($section->questions()->count() < 1) {
-            throw ValidationException::withMessages([
-                'section_id' => 'La sección debe tener al menos una pregunta.',
-            ]);
-        }
+        $this->evaluationBalance->assertReadyToPlay($section);
 
         return Room::query()->create([
             'code' => Room::generateUniqueCode(),
@@ -228,11 +227,10 @@ class QuizRoomService
         $pointsAwarded = 0;
 
         if ($isCorrect) {
-            $basePoints = (int) ($currentQuestion->points ?: 1000);
-            $timeLimitSeconds = max(1, (int) ($currentQuestion->time_limit ?: 30));
-            $elapsedSeconds = $room->questionElapsedSeconds();
-            $speedBonus = max(0, ($timeLimitSeconds - $elapsedSeconds) / $timeLimitSeconds) * 500;
-            $pointsAwarded = (int) ($basePoints * 0.5 + $speedBonus);
+            $pointsAwarded = QuestionScoring::awardForQuestion(
+                $currentQuestion,
+                $room->questionElapsedSeconds()
+            );
         }
 
         $playerAnswer = PlayerAnswer::query()->create([

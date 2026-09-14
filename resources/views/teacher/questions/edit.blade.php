@@ -23,3 +23,7 @@
         </form>
     </div>
 @endsection
+
+@push('scripts')
+    <script src="{{ asset('js/question-form.js') }}" defer></script>
+@endpush

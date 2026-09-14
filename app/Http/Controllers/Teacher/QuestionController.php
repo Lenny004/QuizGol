@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Teacher;
 use App\Http\Controllers\Controller;
 use App\Models\Question;
 use App\Models\Section;
+use App\Services\EvaluationBalanceService;
+use App\Support\QuestionScoring;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,7 @@ class QuestionController extends Controller
     /**
      * Lista las preguntas de la sección ordenadas por sort_order.
      */
-    public function index(Section $section): View
+    public function index(Section $section, EvaluationBalanceService $evaluationBalance): View
     {
         $this->authorizeSection($section);
 
@@ -30,8 +32,9 @@ class QuestionController extends Controller
             ->get();
 
         $section->load(['subject', 'grade']);
+        $balance = $evaluationBalance->analyzeQuestions($questions);
 
-        return view('teacher.questions.index', compact('section', 'questions'));
+        return view('teacher.questions.index', compact('section', 'questions', 'balance'));
     }
 
     /**
@@ -149,15 +152,14 @@ class QuestionController extends Controller
      * Valida pregunta y limpia respuestas vacías.
      * Reindexa las respuestas para que correct_index apunte a la lista final.
      *
-     * @return array{prompt: string, difficulty: string|null, time_limit: int, points: int, answers: array<int, string>, correct_index: int}
+     * @return array{prompt: string, difficulty: string, time_limit: int, points: int, answers: array<int, string>, correct_index: int}
      */
     private function validateQuestion(Request $request): array
     {
         $validatedData = $request->validate([
             'prompt' => ['required', 'string', 'max:2000'],
-            'difficulty' => ['nullable', 'in:easy,medium,hard'],
+            'difficulty' => ['required', 'in:easy,medium,hard'],
             'time_limit' => ['required', 'integer', 'min:5', 'max:120'],
-            'points' => ['required', 'integer', 'min:100', 'max:5000'],
             'answers' => ['required', 'array', 'min:2', 'max:4'],
             'answers.*' => ['nullable', 'string', 'max:500'],
             'correct_index' => ['required', 'integer', 'min:0', 'max:3'],
@@ -192,9 +194,9 @@ class QuestionController extends Controller
 
         return [
             'prompt' => $validatedData['prompt'],
-            'difficulty' => $validatedData['difficulty'] ?? null,
+            'difficulty' => $validatedData['difficulty'],
             'time_limit' => $validatedData['time_limit'],
-            'points' => $validatedData['points'],
+            'points' => QuestionScoring::basePoints($validatedData['difficulty']),
             'answers' => $reindexedAnswers,
             'correct_index' => (int) $newCorrectIndex,
         ];

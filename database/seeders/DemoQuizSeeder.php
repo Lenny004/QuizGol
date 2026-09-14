@@ -7,6 +7,7 @@ use App\Models\Question;
 use App\Models\Section;
 use App\Models\Subject;
 use App\Models\User;
+use App\Support\QuestionScoring;
 use Illuminate\Database\Seeder;
 
 /**
@@ -38,8 +39,10 @@ class DemoQuizSeeder extends Seeder
             ]
         );
 
-        // Evita duplicar el banco si se vuelve a ejecutar el seeder.
+        // Si ya hay banco, alinea puntos/dificultad para que la demo quede equilibrada.
         if ($section->questions()->exists()) {
+            $this->alignExistingDemo($section);
+
             return;
         }
 
@@ -63,10 +66,10 @@ class DemoQuizSeeder extends Seeder
                 'correct' => 1,
             ],
             [
-                'prompt' => '¿Cuál es el resultado de 9 × 3?',
-                'difficulty' => 'medium',
-                'answers' => ['27', '21', '24', '30'],
-                'correct' => 0,
+                'prompt' => 'Un entrenador reparte 36 balones en 4 equipos iguales. ¿Cuántos recibe cada uno?',
+                'difficulty' => 'hard',
+                'answers' => ['8', '9', '6', '12'],
+                'correct' => 1,
             ],
         ];
 
@@ -76,7 +79,7 @@ class DemoQuizSeeder extends Seeder
                 'type' => Question::TYPE_MULTIPLE_CHOICE,
                 'difficulty' => $item['difficulty'],
                 'time_limit' => 30,
-                'points' => 1000,
+                'points' => QuestionScoring::basePoints($item['difficulty']),
                 'sort_order' => $index,
             ]);
 
@@ -85,6 +88,31 @@ class DemoQuizSeeder extends Seeder
                     'text' => $answerText,
                     'is_correct' => $answerIndex === $item['correct'],
                     'sort_order' => $answerIndex,
+                ]);
+            }
+        }
+    }
+
+    private function alignExistingDemo(Section $section): void
+    {
+        $questions = $section->questions()->orderBy('sort_order')->orderBy('id')->get();
+
+        foreach ($questions as $question) {
+            if (in_array($question->difficulty, ['easy', 'medium', 'hard'], true)) {
+                $question->update([
+                    'points' => QuestionScoring::basePoints($question->difficulty),
+                ]);
+            }
+        }
+
+        $hasHard = $questions->contains(fn (Question $question) => $question->difficulty === 'hard');
+
+        if (! $hasHard) {
+            $candidate = $questions->last();
+            if ($candidate) {
+                $candidate->update([
+                    'difficulty' => 'hard',
+                    'points' => QuestionScoring::basePoints('hard'),
                 ]);
             }
         }

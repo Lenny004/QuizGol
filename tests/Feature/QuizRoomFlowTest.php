@@ -39,7 +39,7 @@ class QuizRoomFlowTest extends TestCase
 
     public function test_host_state_does_not_spoil_correct_answers_while_asking(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection();
         $service = app(QuizRoomService::class);
         $room = $service->createRoom($teacher, $section);
         $service->start($room);
@@ -54,7 +54,7 @@ class QuizRoomFlowTest extends TestCase
 
     public function test_late_answers_are_rejected_after_timeout(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1, 5);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(3, 5);
         $service = app(QuizRoomService::class);
         $room = $service->createRoom($teacher, $section);
         $service->start($room);
@@ -77,7 +77,7 @@ class QuizRoomFlowTest extends TestCase
 
     public function test_reveal_shows_correct_answers_and_rejects_new_submissions(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection();
         $service = app(QuizRoomService::class);
         $room = $service->createRoom($teacher, $section);
         $service->start($room);
@@ -102,7 +102,7 @@ class QuizRoomFlowTest extends TestCase
 
     public function test_player_can_join_and_answer_during_asking(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection();
         $service = app(QuizRoomService::class);
         $room = $service->createRoom($teacher, $section);
         $service->start($room);
@@ -113,15 +113,17 @@ class QuizRoomFlowTest extends TestCase
         $answer = $service->submitAnswer($player, $room->fresh(), $correct->id);
 
         $this->assertTrue($answer->is_correct);
+        $this->assertSame(500, $answer->points_awarded);
         $this->assertDatabaseHas('player_answers', [
             'room_player_id' => $player->id,
             'is_correct' => true,
+            'points_awarded' => 500,
         ]);
     }
 
     public function test_join_lookup_reports_mode(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection();
         $room = app(QuizRoomService::class)->createRoom($teacher, $section);
 
         $this->getJson(route('play.join.lookup', ['code' => $room->code]))
@@ -133,7 +135,7 @@ class QuizRoomFlowTest extends TestCase
 
     public function test_results_page_is_available_for_host(): void
     {
-        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection(1);
+        ['teacher' => $teacher, 'section' => $section] = $this->createTeacherWithSection();
         $service = app(QuizRoomService::class);
         $room = $service->createRoom($teacher, $section);
         $service->start($room);

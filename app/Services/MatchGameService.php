@@ -21,16 +21,16 @@ use RuntimeException;
  */
 class MatchGameService
 {
+    public function __construct(private EvaluationBalanceService $evaluationBalance)
+    {
+    }
+
     /**
      * Crea sala mode=match + 2 equipos (Local / Visitante) + fila MatchGame.
      */
     public function createRoom(User $host, Section $section): Room
     {
-        if ($section->questions()->count() < 1) {
-            throw ValidationException::withMessages([
-                'section_id' => 'La sección debe tener al menos una pregunta.',
-            ]);
-        }
+        $this->evaluationBalance->assertReadyToPlay($section);
 
         return DB::transaction(function () use ($host, $section) {
             $room = Room::query()->create([
