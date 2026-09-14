@@ -1,13 +1,6 @@
 /**
  * UI del jugador (play.js)
- *
- * - Polling del estado cada 1.5s (GET play.state)
- * - Envío de respuesta (POST play.answer)
- * - Fases: lobby → question → reveal → finished
- * - En mode=match muestra marcador y equipo
- *
- * Animaciones actuales: CSS feedback--goal / feedback--miss
- * (placeholder para Lottie en public/lottie/)
+ * Fases: lobby → question → waiting → reveal → finished
  */
 (function () {
   const root = document.getElementById('play-app');
@@ -20,7 +13,6 @@
     answer: root.dataset.answerUrl,
   };
 
-  // Referencias a elementos del DOM (evita querySelector repetidos).
   const elements = {
     nick: document.getElementById('play-nick'),
     score: document.getElementById('play-score'),
@@ -53,15 +45,13 @@
     'answer-grid__btn--green',
   ];
 
-  /** Muestra solo el bloque de la fase actual. */
   function showPhase(phase) {
     elements.lobby.hidden = phase !== 'lobby';
     elements.question.hidden = phase !== 'question';
-    elements.reveal.hidden = phase !== 'reveal';
+    elements.reveal.hidden = phase !== 'reveal' && phase !== 'waiting';
     elements.finished.hidden = phase !== 'finished';
   }
 
-  /** Badge con el nombre del equipo (solo mode=match). */
   function renderTeamBadge(myTeam) {
     if (!elements.teamBadge) return;
     if (!myTeam) {
@@ -73,7 +63,6 @@
     elements.teamBadge.className = 'team__badge team__badge--' + (myTeam.side || '');
   }
 
-  /** Actualiza el marcador Local vs Visitante. */
   function renderMatch(match) {
     if (!match || gameMode !== 'match') return;
     if (elements.homeName) elements.homeName.textContent = match.home.name;
@@ -82,7 +71,6 @@
     if (elements.awayGoals) elements.awayGoals.textContent = match.away.goals;
   }
 
-  /** Cuenta regresiva basada en started_at + time_limit del servidor. */
   function startCountdown(startedAt, timeLimit) {
     if (countdownTimer) clearInterval(countdownTimer);
     const startMs = new Date(startedAt).getTime();
@@ -97,7 +85,6 @@
     countdownTimer = setInterval(tick, 250);
   }
 
-  /** Dibuja los botones de opciones (sin marcar cuál es correcta). */
   function renderAnswers(answers) {
     elements.answers.innerHTML = '';
     (answers || []).forEach((answer, index) => {
@@ -111,7 +98,6 @@
     });
   }
 
-  /** Envía la respuesta elegida al servidor. */
   async function submitAnswer(answerId) {
     if (isSubmittingAnswer) return;
     isSubmittingAnswer = true;
@@ -145,22 +131,54 @@
     }
   }
 
-  /** Feedback visual tras responder (gol / fallo). */
-  function renderReveal(myAnswer) {
+  function renderWaitingOrReveal(state) {
+    const myAnswer = state.my_answer;
     const isCorrect = myAnswer && myAnswer.is_correct;
-    const feedbackClass = isCorrect ? 'feedback--goal' : 'feedback--miss';
-    const emoji = isCorrect ? '⚽ GOL!' : '💨 Fallo';
-    const pointsAwarded = myAnswer ? myAnswer.points_awarded : 0;
-    const goalNote = isCorrect && gameMode === 'match'
-      ? '<p class="text--muted">+1 gol para tu equipo</p>'
-      : '';
+    const collective = state.phase === 'reveal';
+    const feedbackClass = myAnswer
+      ? isCorrect
+        ? 'feedback--goal'
+        : 'feedback--miss'
+      : 'feedback--miss';
+
+    let title = 'Esperando a los demás…';
+    let detail = 'Ya respondiste. Cuando termine el tiempo se revelará la correcta.';
+
+    if (collective) {
+      title = myAnswer
+        ? isCorrect
+          ? '⚽ ¡GOL!'
+          : '💨 Fallo'
+        : 'Tiempo agotado';
+      detail = myAnswer
+        ? isCorrect
+          ? '+' + myAnswer.points_awarded + ' puntos'
+          : 'Mira la respuesta correcta en el proyector'
+        : 'No alcanzaste a responder';
+
+      if (state.question && state.question.answers) {
+        const correct = state.question.answers.find((a) => a.is_correct);
+        if (correct) {
+          detail += '<br><strong>Correcta:</strong> ' + escapeHtml(correct.text);
+        }
+      }
+    } else if (myAnswer) {
+      title = isCorrect ? '⚽ ¡GOL!' : 'Respuesta enviada';
+      detail = isCorrect
+        ? '+' + myAnswer.points_awarded + ' puntos · esperando revelación'
+        : 'Esperando revelación…';
+    }
+
+    const goalNote =
+      collective && isCorrect && gameMode === 'match'
+        ? '<p class="text--muted">+1 gol para tu equipo</p>'
+        : '';
 
     elements.revealContent.innerHTML =
-      `<div class="feedback ${feedbackClass}"><span class="feedback__emoji">${emoji}</span>` +
-      `<p>${isCorrect ? '+' + pointsAwarded + ' puntos' : 'Sigue intentando'}</p>${goalNote}</div>`;
+      `<div class="feedback ${feedbackClass}"><span class="feedback__emoji">${title}</span>` +
+      `<p>${detail}</p>${goalNote}</div>`;
   }
 
-  /** Ranking final / parcial. */
   function renderScoreboard(rows) {
     elements.scoreboard.innerHTML = (rows || [])
       .map((row, index) =>
@@ -169,7 +187,6 @@
       .join('');
   }
 
-  /** Resultado del partido al finalizar. */
   function renderFinalMatch(match) {
     if (!elements.finalMatch || !match) return;
     elements.finalMatch.hidden = false;
@@ -181,7 +198,6 @@
     elements.finalMatch.textContent = scoreLine + ' · ' + resultLabel;
   }
 
-  /** Aplica el JSON de estado a la UI. */
   function applyState(state) {
     elements.score.textContent = (state.my_score || 0) + ' pts';
     if (state.nickname) elements.nick.textContent = state.nickname;
@@ -204,19 +220,17 @@
       return;
     }
 
-    if (state.phase === 'reveal' && state.my_answer) {
+    if (state.phase === 'waiting' || state.phase === 'reveal') {
       showPhase('reveal');
-      renderReveal(state.my_answer);
+      renderWaitingOrReveal(state);
       isSubmittingAnswer = false;
       return;
     }
 
-    // phase === 'question'
     showPhase('question');
     const question = state.question;
     if (question) {
       elements.prompt.textContent = question.prompt;
-      // Solo re-renderiza opciones/countdown cuando cambia la pregunta.
       if (question.id !== lastQuestionId) {
         lastQuestionId = question.id;
         isSubmittingAnswer = false;
@@ -226,7 +240,6 @@
     }
   }
 
-  /** Consulta el estado al servidor. */
   async function poll() {
     try {
       const response = await fetch(urls.state, {
@@ -235,11 +248,10 @@
       });
       if (response.ok) applyState(await response.json());
     } catch (error) {
-      // Silencioso: el siguiente poll reintentará.
+      // Silencioso
     }
   }
 
-  /** Escapa HTML para evitar XSS en nicknames del scoreboard. */
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')

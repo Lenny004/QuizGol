@@ -9,10 +9,13 @@
         class="host"
         data-room-id="{{ $room->id }}"
         data-mode="{{ $room->mode }}"
+        data-join-url="{{ url('/join?code='.$room->code) }}"
         data-state-url="{{ route('rooms.state', $room) }}"
         data-start-url="{{ route('rooms.start', $room) }}"
+        data-reveal-url="{{ route('rooms.reveal', $room) }}"
         data-next-url="{{ route('rooms.next', $room) }}"
         data-finish-url="{{ route('rooms.finish', $room) }}"
+        data-results-url="{{ route('rooms.results', $room) }}"
         data-csrf="{{ csrf_token() }}"
     >
         <div class="host__top">
@@ -32,7 +35,9 @@
             </div>
             <div class="host__controls" id="host-controls">
                 <button type="button" class="btn btn--gold" id="btn-start" hidden>Iniciar</button>
-                <button type="button" class="btn btn--primary" id="btn-next" hidden>Siguiente pregunta</button>
+                <button type="button" class="btn btn--primary" id="btn-reveal" hidden>Revelar respuestas</button>
+                <button type="button" class="btn btn--gold" id="btn-next" hidden>Siguiente pregunta</button>
+                <a class="btn btn--ghost" id="btn-results" href="{{ route('rooms.results', $room) }}" hidden>Ver reporte</a>
                 <button type="button" class="btn btn--danger" id="btn-finish" hidden>Finalizar</button>
             </div>
         </div>
@@ -55,8 +60,25 @@
         <div class="host__grid">
             <section class="card">
                 <div id="host-lobby">
-                    <h2>Lobby</h2>
-                    <p class="text--muted">Esperando jugadores… Comparte el código en grande.</p>
+                    <div class="join-panel">
+                        <div class="join-panel__qr-wrap">
+                            <div id="host-qr" class="join-panel__qr" aria-label="Código QR para unirse"></div>
+                            <p class="join-panel__scan-hint">Escanea con la cámara del celular</p>
+                        </div>
+                        <div class="join-panel__steps">
+                            <h2 class="join-panel__title">¡Entra al partido!</h2>
+                            <ol class="join-panel__list">
+                                <li><strong>Abre la cámara</strong> de tu celular</li>
+                                <li><strong>Escanea el QR</strong> o ve a <code>{{ url('/join') }}</code></li>
+                                <li>Escribe el código <strong class="join-panel__code">{{ $room->code }}</strong> y tu apodo</li>
+                                @if ($room->mode === 'match')
+                                    <li>Elige equipo: <strong>Local</strong> o <strong>Visitante</strong></li>
+                                @endif
+                            </ol>
+                            <p class="join-panel__url text--muted" id="host-join-url">{{ url('/join?code='.$room->code) }}</p>
+                        </div>
+                    </div>
+                    <h3 class="join-panel__players-title">Jugadores en lobby</h3>
                     <ul class="scoreboard" id="host-player-list"></ul>
                 </div>
 
@@ -64,6 +86,7 @@
                     <div class="question__meta">
                         <span id="host-q-progress"></span>
                         <span class="question__countdown" id="host-countdown">–</span>
+                        <span class="question__phase-badge" id="host-phase-badge" hidden></span>
                     </div>
                     <h2 class="question__prompt" id="host-prompt"></h2>
                     <div class="host__answers" id="host-answers"></div>
@@ -72,7 +95,8 @@
 
                 <div id="host-finished" hidden>
                     <h2 class="feedback--goal">¡Partido terminado!</h2>
-                    <p class="text--muted">Resultados finales abajo.</p>
+                    <p class="text--muted">Revisa el reporte pedagógico con aciertos por pregunta.</p>
+                    <a class="btn btn--gold" href="{{ route('rooms.results', $room) }}">Abrir reporte</a>
                 </div>
             </section>
 
@@ -83,5 +107,6 @@
         </div>
     </div>
 
+    <script src="{{ asset('js/qrcode.min.js') }}" defer></script>
     <script src="{{ asset('js/host.js') }}" defer></script>
 @endsection

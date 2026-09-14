@@ -27,6 +27,7 @@ Route::get('/', function () {
 
 // --- Jugadores (sin autenticación) ---
 Route::get('/join', [JoinController::class, 'show'])->name('play.join');
+Route::get('/join/lookup', [JoinController::class, 'lookup'])->name('play.join.lookup');
 Route::post('/join', [JoinController::class, 'store'])->name('play.join.store');
 Route::get('/play/{code}', [PlayController::class, 'show'])->name('play.game');
 Route::get('/play/{code}/state', [PlayController::class, 'state'])->name('play.state');
@@ -46,7 +47,9 @@ Route::middleware(['auth', 'teacher'])->group(function () {
     Route::post('/rooms', [RoomController::class, 'store'])->name('rooms.store');
     Route::get('/rooms/{room}/host', [HostController::class, 'show'])->name('rooms.host');
     Route::get('/rooms/{room}/state', [HostController::class, 'state'])->name('rooms.state');
+    Route::get('/rooms/{room}/results', [RoomController::class, 'results'])->name('rooms.results');
     Route::post('/rooms/{room}/start', [RoomController::class, 'start'])->name('rooms.start');
+    Route::post('/rooms/{room}/reveal', [RoomController::class, 'reveal'])->name('rooms.reveal');
     Route::post('/rooms/{room}/next', [RoomController::class, 'next'])->name('rooms.next');
     Route::post('/rooms/{room}/finish', [RoomController::class, 'finish'])->name('rooms.finish');
 });

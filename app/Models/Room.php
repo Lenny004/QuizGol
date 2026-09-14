@@ -12,22 +12,28 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * Estados (status): lobby → active → finished
  * Modos (mode): quiz (individual) | match (2 equipos)
+ * Fase de pregunta (question_phase): asking → reveal
  *
  * El código corto (code) es lo que escriben los alumnos al unirse.
  */
 class Room extends Model
 {
-    /** Estados posibles de la sala. */
     public const STATUS_LOBBY = 'lobby';
 
     public const STATUS_ACTIVE = 'active';
 
     public const STATUS_FINISHED = 'finished';
 
-    /** Modos de juego. */
     public const MODE_QUIZ = 'quiz';
 
     public const MODE_MATCH = 'match';
+
+    public const PHASE_ASKING = 'asking';
+
+    public const PHASE_REVEAL = 'reveal';
+
+    /** Segundos que dura la revelación colectiva antes del auto-avance. */
+    public const REVEAL_DURATION_SECONDS = 8;
 
     protected $fillable = [
         'code',
@@ -36,7 +42,9 @@ class Room extends Model
         'host_id',
         'section_id',
         'current_question_id',
+        'question_phase',
         'question_started_at',
+        'reveal_started_at',
     ];
 
     /**
@@ -46,43 +54,35 @@ class Room extends Model
     {
         return [
             'question_started_at' => 'datetime',
+            'reveal_started_at' => 'datetime',
         ];
     }
 
-    /** Maestro anfitrión (proyecta la pantalla host). */
     public function host(): BelongsTo
     {
         return $this->belongsTo(User::class, 'host_id');
     }
 
-    /** Sección (banco de preguntas) de esta sala. */
     public function section(): BelongsTo
     {
         return $this->belongsTo(Section::class);
     }
 
-    /** Pregunta que se está mostrando ahora (null en lobby/finished). */
     public function currentQuestion(): BelongsTo
     {
         return $this->belongsTo(Question::class, 'current_question_id');
     }
 
-    /** Jugadores unidos a la sala. */
     public function players(): HasMany
     {
         return $this->hasMany(RoomPlayer::class);
     }
 
-    /** Equipos (solo en mode=match: Local y Visitante). */
     public function teams(): HasMany
     {
         return $this->hasMany(Team::class);
     }
 
-    /**
-     * Datos del partido (marcador, equipos).
-     * Se llama matchGame (no match) para no chocar con la palabra reservada SQL.
-     */
     public function matchGame(): HasOne
     {
         return $this->hasOne(MatchGame::class);
@@ -106,6 +106,42 @@ class Room extends Model
     public function isMatchMode(): bool
     {
         return $this->mode === self::MODE_MATCH;
+    }
+
+    public function isAsking(): bool
+    {
+        return $this->question_phase === self::PHASE_ASKING;
+    }
+
+    public function isRevealing(): bool
+    {
+        return $this->question_phase === self::PHASE_REVEAL;
+    }
+
+    /**
+     * Segundos transcurridos desde que arrancó la pregunta actual.
+     */
+    public function questionElapsedSeconds(): int
+    {
+        if (! $this->question_started_at) {
+            return 0;
+        }
+
+        return max(0, (int) $this->question_started_at->diffInSeconds(now()));
+    }
+
+    /**
+     * True si el tiempo de la pregunta actual ya se agotó.
+     */
+    public function isQuestionTimedOut(): bool
+    {
+        if (! $this->isAsking() || ! $this->currentQuestion) {
+            return false;
+        }
+
+        $limit = max(1, (int) ($this->currentQuestion->time_limit ?: 30));
+
+        return $this->questionElapsedSeconds() >= $limit;
     }
 
     /**

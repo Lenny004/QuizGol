@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Play;
 
 use App\Http\Controllers\Controller;
 use App\Models\Room;
+use App\Models\RoomPlayer;
 use App\Services\MatchGameService;
 use App\Services\QuizRoomService;
+use App\Support\PlayerSessionCookie;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -13,8 +16,6 @@ use Illuminate\View\View;
 
 /**
  * Unirse a una sala pública (sin login) con código + apodo.
- *
- * Guarda session_token en cookie httponly "quizgol_player".
  */
 class JoinController extends Controller
 {
@@ -24,17 +25,43 @@ class JoinController extends Controller
     ) {
     }
 
-    /**
-     * Formulario: código de sala, apodo y (si es partido) equipo.
-     */
-    public function show(): View
+    public function show(Request $request): View
     {
-        return view('play.join');
+        $prefillCode = strtoupper(trim((string) $request->query('code', '')));
+
+        return view('play.join', [
+            'prefillCode' => $prefillCode,
+        ]);
     }
 
     /**
-     * Crea el RoomPlayer y redirige a /play/{code} con la cookie de sesión.
+     * Devuelve modo/estado de una sala para adaptar el formulario (equipo solo en match).
      */
+    public function lookup(Request $request): JsonResponse
+    {
+        $code = strtoupper(trim((string) $request->query('code', '')));
+
+        if ($code === '') {
+            return response()->json(['found' => false], 404);
+        }
+
+        $room = Room::query()->with('section')->where('code', $code)->first();
+
+        if (! $room) {
+            return response()->json(['found' => false], 404);
+        }
+
+        return response()->json([
+            'found' => true,
+            'code' => $room->code,
+            'mode' => $room->mode,
+            'status' => $room->status,
+            'is_match' => $room->isMatchMode(),
+            'can_join' => in_array($room->status, [Room::STATUS_LOBBY, Room::STATUS_ACTIVE], true),
+            'section_title' => $room->section?->title,
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validatedData = $request->validate([
@@ -59,6 +86,22 @@ class JoinController extends Controller
                 ->withErrors(['code' => 'Esta sala ya terminó.']);
         }
 
+        // Rejoin: si la cookie ya pertenece a un jugador de esta sala, reentrar.
+        $existingToken = PlayerSessionCookie::token($request);
+        if ($existingToken) {
+            $existingPlayer = RoomPlayer::query()
+                ->where('room_id', $room->id)
+                ->where('session_token', $existingToken)
+                ->first();
+
+            if ($existingPlayer) {
+                return redirect()
+                    ->route('play.game', ['code' => $room->code])
+                    ->withCookie(PlayerSessionCookie::make($existingPlayer->session_token))
+                    ->with('success', '¡Bienvenido de nuevo, '.$existingPlayer->nickname.'!');
+            }
+        }
+
         try {
             if ($room->isMatchMode()) {
                 $player = $this->matchGames->createPlayer(
@@ -74,20 +117,9 @@ class JoinController extends Controller
             return back()->withInput()->withErrors($exception->errors());
         }
 
-        // Cookie de 24h: identifica al jugador en las siguientes peticiones.
-        $playerCookie = cookie(
-            'quizgol_player',
-            $player->session_token,
-            60 * 24,
-            '/',
-            null,
-            false,
-            true
-        );
-
         return redirect()
             ->route('play.game', ['code' => $room->code])
-            ->withCookie($playerCookie)
+            ->withCookie(PlayerSessionCookie::make($player->session_token))
             ->with('success', '¡Bienvenido al partido!');
     }
 }

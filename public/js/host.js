@@ -1,9 +1,7 @@
 /**
  * UI del anfitrión / proyector (host.js)
  *
- * - Polling del estado cada 1.5s (GET rooms.state)
- * - Controles: iniciar, siguiente pregunta, finalizar
- * - Muestra lista de jugadores, pregunta actual y marcador (mode=match)
+ * Flujo: lobby (QR) → asking → reveal → siguiente (auto o manual)
  */
 (function () {
   const root = document.getElementById('host-app');
@@ -11,11 +9,14 @@
 
   const csrfToken = root.dataset.csrf;
   const gameMode = root.dataset.mode || 'quiz';
+  const joinUrl = root.dataset.joinUrl;
   const urls = {
     state: root.dataset.stateUrl,
     start: root.dataset.startUrl,
+    reveal: root.dataset.revealUrl,
     next: root.dataset.nextUrl,
     finish: root.dataset.finishUrl,
+    results: root.dataset.resultsUrl,
   };
 
   const elements = {
@@ -29,9 +30,13 @@
     answered: document.getElementById('host-answered'),
     countdown: document.getElementById('host-countdown'),
     progress: document.getElementById('host-q-progress'),
+    phaseBadge: document.getElementById('host-phase-badge'),
     btnStart: document.getElementById('btn-start'),
+    btnReveal: document.getElementById('btn-reveal'),
     btnNext: document.getElementById('btn-next'),
     btnFinish: document.getElementById('btn-finish'),
+    btnResults: document.getElementById('btn-results'),
+    qrCanvas: document.getElementById('host-qr'),
     matchHomeName: document.getElementById('match-home-name'),
     matchAwayName: document.getElementById('match-away-name'),
     matchHomeGoals: document.getElementById('match-home-goals'),
@@ -41,8 +46,27 @@
 
   let countdownTimer = null;
   let lastQuestionId = null;
+  let lastPhase = null;
+  let qrDrawn = false;
 
-  /** POST a start/next/finish; devuelve el estado host o null si falló. */
+  function drawQr() {
+    if (qrDrawn || !elements.qrCanvas || !joinUrl) return;
+    if (typeof QRCode === 'undefined') {
+      setTimeout(drawQr, 120);
+      return;
+    }
+    elements.qrCanvas.innerHTML = '';
+    new QRCode(elements.qrCanvas, {
+      text: joinUrl,
+      width: 260,
+      height: 260,
+      colorDark: '#0B3D2E',
+      colorLight: '#F7F3E8',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+    qrDrawn = true;
+  }
+
   async function postAction(url) {
     const response = await fetch(url, {
       method: 'POST',
@@ -60,7 +84,6 @@
     return response.json();
   }
 
-  /** Actualiza marcador Local vs Visitante. */
   function renderMatch(match) {
     if (!match || gameMode !== 'match') return;
     if (elements.matchHomeName) elements.matchHomeName.textContent = match.home.name;
@@ -99,7 +122,6 @@
     return '';
   }
 
-  /** Lista de jugadores en lobby (con chip de equipo si aplica). */
   function renderPlayers(players) {
     elements.playerList.innerHTML = (players || [])
       .map((player) => {
@@ -109,7 +131,7 @@
           : '';
         return `<li>${escapeHtml(player.nickname)}${badge}</li>`;
       })
-      .join('') || '<li class="text--muted">Nadie aún</li>';
+      .join('') || '<li class="text--muted">Nadie aún — proyecta el QR</li>';
   }
 
   function startCountdown(startedAt, timeLimit) {
@@ -126,16 +148,27 @@
     countdownTimer = setInterval(tick, 250);
   }
 
-  /** Pregunta actual + opciones (el host sí ve cuál es correcta). */
   function renderQuestion(state) {
     const question = state.question;
     if (!question) return;
+
+    const isReveal = state.question_phase === 'reveal' || state.phase === 'reveal';
 
     elements.prompt.textContent = question.prompt;
     elements.progress.textContent = state.question_index
       ? `Pregunta ${state.question_index} / ${state.total_questions}`
       : '';
     elements.answered.textContent = `${state.answered_count} / ${state.players_count} respondieron`;
+
+    if (elements.phaseBadge) {
+      if (isReveal) {
+        elements.phaseBadge.hidden = false;
+        elements.phaseBadge.textContent = 'Revelación';
+        elements.countdown.textContent = '✓';
+      } else {
+        elements.phaseBadge.hidden = true;
+      }
+    }
 
     const answerColors = [
       'host__answer--red',
@@ -145,38 +178,55 @@
     ];
     elements.answers.innerHTML = (question.answers || [])
       .map((answer, index) => {
-        const correctClass = answer.is_correct ? ' host__answer--correct' : '';
-        return `<div class="host__answer ${answerColors[index % 4]}${correctClass}">${escapeHtml(answer.text)}</div>`;
+        const correctClass = isReveal && answer.is_correct ? ' host__answer--correct' : '';
+        const dimClass = isReveal && answer.is_correct === false ? ' host__answer--dim' : '';
+        const stats =
+          isReveal && answer.count != null
+            ? `<span class="host__answer-stat">${answer.count} · ${answer.percent || 0}%</span>`
+            : '';
+        return (
+          `<div class="host__answer ${answerColors[index % 4]}${correctClass}${dimClass}">` +
+          `<span>${escapeHtml(answer.text)}</span>${stats}</div>`
+        );
       })
       .join('');
 
-    if (question.id !== lastQuestionId) {
+    if (question.id !== lastQuestionId || question.phase !== lastPhase) {
+      if (question.id !== lastQuestionId && !isReveal) {
+        startCountdown(question.started_at, question.time_limit);
+      }
       lastQuestionId = question.id;
-      startCountdown(question.started_at, question.time_limit);
-    } else {
-      elements.answered.textContent = `${state.answered_count} / ${state.players_count} respondieron`;
+      lastPhase = question.phase;
     }
   }
 
-  /** Aplica el JSON de estado a la UI del host. */
   function applyState(state) {
     renderScoreboard(state.scoreboard);
     renderPlayers(state.players);
     renderMatch(state.match);
 
+    const isAsking = state.status === 'active' && state.question_phase === 'asking';
+    const isReveal = state.status === 'active' && state.question_phase === 'reveal';
+
     elements.btnStart.hidden = state.status !== 'lobby';
-    elements.btnNext.hidden = state.status !== 'active';
+    elements.btnReveal.hidden = !isAsking;
+    elements.btnNext.hidden = !isReveal;
     elements.btnFinish.hidden = state.status === 'finished';
+    if (elements.btnResults) {
+      elements.btnResults.hidden = state.status !== 'finished';
+    }
 
     elements.lobby.hidden = state.status !== 'lobby';
     elements.question.hidden = state.status !== 'active';
     elements.finished.hidden = state.status !== 'finished';
 
+    if (state.status === 'lobby') {
+      drawQr();
+      lastQuestionId = null;
+      lastPhase = null;
+    }
     if (state.status === 'active') {
       renderQuestion(state);
-    }
-    if (state.status === 'lobby') {
-      lastQuestionId = null;
     }
   }
 
@@ -194,6 +244,10 @@
 
   elements.btnStart.addEventListener('click', async () => {
     const state = await postAction(urls.start);
+    if (state) applyState(state);
+  });
+  elements.btnReveal.addEventListener('click', async () => {
+    const state = await postAction(urls.reveal);
     if (state) applyState(state);
   });
   elements.btnNext.addEventListener('click', async () => {
@@ -214,6 +268,7 @@
       .replace(/"/g, '&quot;');
   }
 
+  drawQr();
   poll();
   setInterval(poll, 1500);
 })();

@@ -6,30 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Models\Room;
 use App\Models\RoomPlayer;
 use App\Services\QuizRoomService;
+use App\Support\PlayerSessionCookie;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-/**
- * Pantalla del jugador y endpoints de estado / respuesta (polling).
- *
- * El jugador se identifica con la cookie quizgol_player (= session_token).
- */
 class PlayController extends Controller
 {
     public function __construct(private QuizRoomService $quizRooms)
     {
     }
 
-    /**
-     * Vista del juego; exige cookie de jugador válida para esa sala.
-     */
     public function show(string $code): View
     {
         $room = $this->findRoom($code);
         $player = $this->resolvePlayer($code);
 
-        abort_unless($player, 403, 'Debes unirte a la sala primero.');
+        abort_unless($player, 403, 'Debes unirse a la sala primero.');
 
         return view('play.game', [
             'room' => $room,
@@ -37,9 +30,6 @@ class PlayController extends Controller
         ]);
     }
 
-    /**
-     * JSON de estado para play.js (cada 1.5s).
-     */
     public function state(string $code): JsonResponse
     {
         $room = $this->findRoom($code);
@@ -50,9 +40,6 @@ class PlayController extends Controller
         );
     }
 
-    /**
-     * Envía la respuesta del jugador a la pregunta actual.
-     */
     public function answer(Request $request, string $code): JsonResponse
     {
         $room = $this->findRoom($code);
@@ -83,12 +70,9 @@ class PlayController extends Controller
         ]);
     }
 
-    /**
-     * Busca al jugador por cookie quizgol_player en la sala del código dado.
-     */
     private function resolvePlayer(string $code): ?RoomPlayer
     {
-        $sessionToken = request()->cookie('quizgol_player');
+        $sessionToken = PlayerSessionCookie::token();
 
         if (! $sessionToken) {
             return null;
@@ -106,9 +90,6 @@ class PlayController extends Controller
             ->first();
     }
 
-    /**
-     * Busca la sala por código (404 si no existe).
-     */
     private function findRoom(string $code): Room
     {
         return Room::query()

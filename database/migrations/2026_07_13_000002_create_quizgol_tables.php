@@ -87,7 +87,10 @@ return new class extends Migration
             $table->foreignId('host_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('section_id')->constrained()->cascadeOnDelete();
             $table->foreignId('current_question_id')->nullable()->constrained('questions')->nullOnDelete();
+            // asking = respondiendo | reveal = mostrar correcta (estilo Kahoot)
+            $table->string('question_phase', 20)->nullable();
             $table->timestamp('question_started_at')->nullable();
+            $table->timestamp('reveal_started_at')->nullable();
             $table->timestamps();
         });
 

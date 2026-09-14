@@ -40,7 +40,9 @@ class MatchGameService
                 'host_id' => $host->id,
                 'section_id' => $section->id,
                 'current_question_id' => null,
+                'question_phase' => null,
                 'question_started_at' => null,
+                'reveal_started_at' => null,
             ]);
 
             $homeTeam = Team::query()->create([
@@ -102,7 +104,7 @@ class MatchGameService
             'nickname' => $nickname,
             'score' => 0,
             'team_id' => $team->id,
-            'session_token' => Str::random(40),
+            'session_token' => Str::random(64),
         ]);
     }
 

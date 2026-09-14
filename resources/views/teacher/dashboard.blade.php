@@ -40,6 +40,23 @@
         </section>
     @endif
 
+    @if ($recentFinishedRooms->isNotEmpty())
+        <section class="panel panel--spaced">
+            <div class="panel__header">
+                <h2 class="panel__title">Reportes recientes</h2>
+            </div>
+            @foreach ($recentFinishedRooms as $room)
+                <div class="list__row">
+                    <div>
+                        <strong>{{ $room->code }}</strong>
+                        <span class="text--muted"> · {{ $room->section->title }}</span>
+                    </div>
+                    <a class="btn btn--primary btn--sm" href="{{ route('rooms.results', $room) }}">Ver reporte</a>
+                </div>
+            @endforeach
+        </section>
+    @endif
+
     <section class="panel">
         <div class="panel__header">
             <h2 class="panel__title">Secciones recientes</h2>
