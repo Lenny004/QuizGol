@@ -203,7 +203,3 @@ Claves usadas por Docker (también en `.env` si existe):
 | Error 500 / BD | `docker-compose exec app php artisan migrate:fresh --force --seed` |
 | Login no entra | Credenciales de la tabla de arriba; si fallan, vuelve a sembrar |
 | Contenedores “Restarting” | `docker-compose logs app` y revisa el error |
-
-## Animaciones (Lottie)
-
-Gol/fallo usan CSS (`feedback--goal` / `feedback--miss`). `public/lottie/` está reservado para Lottie reales más adelante.
