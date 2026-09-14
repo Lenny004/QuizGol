@@ -32,11 +32,6 @@ class PlayerSessionCookie
         );
     }
 
-    public static function forget(): Cookie
-    {
-        return cookie()->forget(self::NAME);
-    }
-
     public static function token(?Request $request = null): ?string
     {
         $request ??= request();

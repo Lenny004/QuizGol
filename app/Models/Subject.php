@@ -47,13 +47,4 @@ class Subject extends Model
     {
         return $query->where('is_active', true);
     }
-
-    /**
-     * Indica si la materia está disponible para el grado dado.
-     * Se usa al crear/editar secciones para validar la combinación.
-     */
-    public function offersGrade(int $gradeId): bool
-    {
-        return $this->grades()->where('grades.id', $gradeId)->exists();
-    }
 }

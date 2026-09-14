@@ -61,7 +61,7 @@ class Question extends Model
         return $this->hasMany(Answer::class);
     }
 
-    /** Devuelve "Fácil", "Media" o "Difícil", o null si no hay dificultad. */
+    /** Devuelve "Fácil", "Media" o "Difícil". */
     public function difficultyLabel(): ?string
     {
         if (! $this->difficulty) {

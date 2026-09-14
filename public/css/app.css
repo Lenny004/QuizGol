@@ -338,14 +338,6 @@ ul {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.form:not(.form--inline):has(:is(input, select, textarea)[required])::before {
-  content: "Los campos con * son obligatorios";
-  color: var(--color-gold);
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
 .form__field {
   display: grid;
   gap: 0.5rem;
@@ -362,15 +354,6 @@ ul {
   letter-spacing: 0.02em;
   color: var(--color-cream);
   line-height: 1.3;
-}
-
-.form__field:has(> :is(input, select, textarea)[required]) > span:first-of-type::after,
-.form__answers:has(input[required]) > legend::after {
-  content: "*";
-  color: var(--color-gold);
-  font-weight: 800;
-  font-size: 1.05em;
-  line-height: 1;
 }
 
 .form__input {
@@ -733,6 +716,10 @@ select.form__input {
 }
 
 .host__answer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.9rem 1rem;
   border-radius: 10px;
   font-weight: 700;
@@ -1101,13 +1088,6 @@ select.form__input {
   margin-bottom: 0.5rem;
 }
 
-.host__answer {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: center;
-}
-
 .host__answer-stat {
   font-size: 0.85rem;
   opacity: 0.9;
@@ -1262,12 +1242,6 @@ select.form__input {
 .badge--low {
   background: rgba(255, 120, 100, 0.2);
   color: #ffb4a8;
-}
-
-.page-header__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
 }
 
 /* --------------------------------------------------------------------------

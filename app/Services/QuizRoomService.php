@@ -284,7 +284,7 @@ class QuizRoomService
                 'id' => $room->currentQuestion->id,
                 'prompt' => $room->currentQuestion->prompt,
                 'time_limit' => $room->currentQuestion->time_limit,
-                'started_at' => optional($room->question_started_at)?->toIso8601String(),
+                'started_at' => $room->question_started_at?->toIso8601String(),
                 'phase' => $room->question_phase,
                 'answers' => $room->currentQuestion->answers->map(fn (Answer $answer) => [
                     'id' => $answer->id,
@@ -360,8 +360,8 @@ class QuizRoomService
                 'prompt' => $room->currentQuestion->prompt,
                 'time_limit' => $room->currentQuestion->time_limit,
                 'difficulty' => $room->currentQuestion->difficulty,
-                'started_at' => optional($room->question_started_at)?->toIso8601String(),
-                'reveal_started_at' => optional($room->reveal_started_at)?->toIso8601String(),
+                'started_at' => $room->question_started_at?->toIso8601String(),
+                'reveal_started_at' => $room->reveal_started_at?->toIso8601String(),
                 'phase' => $room->question_phase,
                 'answers' => $room->currentQuestion->answers->map(fn (Answer $answer) => [
                     'id' => $answer->id,
